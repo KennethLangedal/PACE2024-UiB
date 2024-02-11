@@ -1,4 +1,4 @@
-#include "gr.h"
+#include "graph.h"
 #include "ocm.h"
 
 #include <stdlib.h>
@@ -9,10 +9,10 @@ int main(int argc, char **argv)
     int N, N0, N1;
     int *V = NULL, *E = NULL;
 
-    gr_parse(stdin, &N, &N0, &N1, &V, &E);
+    graph_parse(stdin, &N, &N0, &N1, &V, &E);
 
-    if (gr_validate(N, N0, N1, V, E))
-        printf("Valid graph. |V|=%d, |E|=%d, |A|=%d, |B|=%d\n", N, V[N], N0, N1);
+    if (graph_validate(N, N0, N1, V, E))
+        printf("|V|=%d, |E|=%d, |A|=%d, |B|=%d\n", N, V[N], N0, N1);
     else
         printf("Error in graph\n");
 

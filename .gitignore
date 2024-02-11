@@ -1,0 +1,5 @@
+pace_exact
+pace_heuristic
+pace_util
+bin/*.o
+bin/*.d
