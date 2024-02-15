@@ -2,6 +2,24 @@
 
 #include <stdio.h>
 
-void graph_parse(FILE *f, int *N, int *N0, int *N1, int **V, int **E);
+typedef struct
+{
+    int N, A, B;
+    int *V, *E;
 
-int graph_validate(int N, int N0, int N1, const int *V, const int *E);
+    int *old_label, *twins;
+} graph;
+
+graph parse_graph(FILE *f);
+
+graph subgraph(graph g, int *mask);
+
+graph remove_degree_one(graph g);
+
+graph *split_graph(graph g, int *N);
+
+graph remove_twins(graph g);
+
+void free_graph(graph g);
+
+int validate_graph(graph g);
