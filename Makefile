@@ -3,7 +3,7 @@ SHELL = /bin/bash
 CC = gcc
 CFLAGS = -g -std=gnu17 -O3 -march=native -I include
 
-OBJ_EXACT = main_exact.o graph.o ocm.o bnb.o
+OBJ_EXACT = main_exact.o graph.o ocm.o bnb.o heuristics.o
 OBJ_HEURISTIC = main_heuristic.o
 OBJ_UTIL = main_util.o graph.o ocm.o
 
@@ -22,7 +22,7 @@ all : exact heuristic util
 -include $(DEP:.o=.d)
 
 exact : $(OBJ_EXACT)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 heuristic : $(OBJ_HEURISTIC)
 	$(CC) $(CFLAGS) -o $@ $^
