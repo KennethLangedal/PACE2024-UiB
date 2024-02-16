@@ -3,7 +3,7 @@ SHELL = /bin/bash
 CC = gcc
 CFLAGS = -g -std=gnu17 -O3 -march=native -I include
 
-OBJ_EXACT = main_exact.o
+OBJ_EXACT = main_exact.o graph.o ocm.o bnb.o
 OBJ_HEURISTIC = main_heuristic.o
 OBJ_UTIL = main_util.o graph.o ocm.o
 

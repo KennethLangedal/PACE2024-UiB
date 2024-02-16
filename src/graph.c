@@ -130,6 +130,19 @@ graph parse_graph(FILE *f)
     return g;
 }
 
+void store_graph(FILE *f, graph g)
+{
+    fprintf(f, "p ocr %d %d %d\n", g.A, g.B, g.V[g.N]);
+    for (int u = 0; u < g.A; u++)
+    {
+        for (int i = g.V[u]; i < g.V[u + 1]; i++)
+        {
+            int v = g.E[i];
+            fprintf(f, "%d %d\n", u + 1, v + 1);
+        }
+    }
+}
+
 graph subgraph(graph g, int *mask)
 {
     graph sg = {.N = 0, .A = 0, .B = 0};
@@ -283,6 +296,27 @@ graph *split_graph(graph g, int *N)
     return cc;
 }
 
+int test_twin(graph g, int u, int v)
+{
+    if (g.V[u + 1] - g.V[u] != g.V[v + 1] - g.V[v])
+        return 0;
+
+    int twin = 1;
+    int i = g.V[u], j = g.V[v];
+    while (i < g.V[u + 1])
+    {
+        if (g.E[i] != g.E[j])
+        {
+            twin = 0;
+            break;
+        }
+        i++;
+        j++;
+    }
+
+    return twin;
+}
+
 graph remove_twins(graph g)
 {
     int *mask = malloc(sizeof(int) * g.N);
@@ -294,26 +328,9 @@ graph remove_twins(graph g)
         if (!mask[u])
             continue;
 
-        int degree = g.V[u + 1] - g.V[u];
-
         for (int v = u + 1; v < g.N; v++)
         {
-            if (degree != g.V[v + 1] - g.V[v])
-                continue;
-
-            int twin = 1;
-            int i = g.V[u], j = g.V[v];
-            while (i < g.V[u + 1])
-            {
-                if (g.E[i] != g.E[j])
-                {
-                    twin = 0;
-                    break;
-                }
-                i++;
-                j++;
-            }
-            if (twin)
+            if (test_twin(g, u, v))
             {
                 g.twins[u]++;
                 mask[v] = 0;
