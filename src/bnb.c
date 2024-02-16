@@ -71,12 +71,32 @@ void bb(int **cm, int **tc, int N, int crossings, int **sol, int *ub, int d)
 
     if (u < 0 && v < 0)
     {
-        if (crossings < *ub)
+        int unset = 0;
+        for (int i = 0; i < N; i++)
+            for (int j = i + 1; j < N; j++)
+                if (tc[i][j] == tc[j][i])
+                    unset += cm[i][j];
+
+        if (crossings + unset < *ub)
         {
-            *ub = crossings;
+            *ub = crossings + unset;
             for (int i = 0; i < N * N; i++)
                 (*sol)[i] = (*tc)[i];
-            // printf("%d %d\n", crossings, d);
+
+            int sanity_check = 0;
+            for (int i = 0; i < N; i++)
+            {
+                for (int j = i + 1; j < N; j++)
+                {
+                    if (cm[i][j] != cm[j][i] && sol[i][j] == sol[j][i])
+                        printf("Error\n");
+                    if (sol[i][j])
+                        sanity_check += cm[i][j];
+                    else
+                        sanity_check += cm[j][i];
+                }
+            }
+            // printf("%d %d %d\n", crossings + unset, sanity_check, d);
         }
         return;
     }
@@ -110,6 +130,8 @@ void bb(int **cm, int **tc, int N, int crossings, int **sol, int *ub, int d)
     free_tc(_tc);
 }
 
+#include "heuristics.h"
+
 int *solve_cc(graph g)
 {
     if (g.B == 0)
@@ -120,10 +142,15 @@ int *solve_cc(graph g)
     int **sol = init_tc(g.B);
 
     tc_add_trivial(tc, cm, g.B);
+    tc_add_independent(tc, cm, g.B);
+
     tc_add_trivial(sol, cm, g.B);
+    tc_add_independent(tc, cm, g.B);
     int cost = upper_bound(cm, sol, g.B);
 
-    printf("solving %d instance (%d)\n", g.B, cost);
+    int heur = greedy_placement(g.B, cm);
+
+    printf("solving %d instance (%d)(%d)\n", g.B, cost, heur);
     // FILE *f = fopen("p.gr", "w");
     // store_graph(f, g);
     // fclose(f);
@@ -300,7 +327,7 @@ int lower_bound(int **cm, int **tc, int N)
     {
         for (int j = i + 1; j < N; j++)
         {
-            if (cm[i][j] != cm[j][i] && !tc[i][j] && !tc[j][i])
+            if (!tc[i][j] && !tc[j][i])
                 lb += cm[i][j] < cm[j][i] ? cm[i][j] : cm[j][i];
         }
     }

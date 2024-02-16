@@ -87,6 +87,39 @@ void tc_add_trivial(int **tc, int **cm, int N)
     }
 }
 
+void tc_add_independent(int **tc, int **cm, int N)
+{
+    for (int i = 0; i < N; i++)
+    {
+        int c = 0;
+        for (int j = 0; j < N; j++)
+        {
+            if (i == j)
+                continue;
+
+            if (tc[i][j] || tc[j][i])
+                c++;
+        }
+
+        if (c == N - 2)
+        {
+            for (int j = 0; j < N; j++)
+            {
+                if (i == j)
+                    continue;
+
+                if (!tc[i][j] && !tc[j][i])
+                {
+                    if (cm[i][j] < cm[j][i])
+                        tc_add_edge(tc, tc, N, i, j, cm);
+                    else
+                        tc_add_edge(tc, tc, N, j, i, cm);
+                }
+            }
+        }
+    }
+}
+
 int tc_try_add_edge(int **tc, int N, int u, int v, int **cm)
 {
     int crossings = 0;

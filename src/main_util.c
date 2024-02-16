@@ -48,6 +48,7 @@ int main(int argc, char **argv)
     int **cm = init_cost_matrix(lc);
     int **tc = init_tc(lc.B);
     tc_add_trivial(tc, cm, lc.B);
+    tc_add_independent(tc, cm, lc.B);
 
     int decided = 0, undecided = 0;
     for (int i = 0; i < lc.B; i++)
@@ -61,7 +62,20 @@ int main(int argc, char **argv)
         }
     }
 
-    printf("%d %d %.2lf%%\n", lc.B, undecided, (double)decided / (double)(decided + undecided) * 100.0);
+    int removable = 0;
+    for (int i = 0; i < lc.B; i++)
+    {
+        int c = 0;
+        for (int j = 0; j < lc.B; j++)
+        {
+            if (i != j && (tc[i][j] || tc[j][i]))
+                c++;
+        }
+        if (c == lc.B - 1)
+            removable++;
+    }
+
+    printf("%d %d %.2lf%%\n", lc.B - removable, undecided, (double)decided / (double)(decided + undecided) * 100.0);
 
     free_graph(g);
     free_graph(g1);
