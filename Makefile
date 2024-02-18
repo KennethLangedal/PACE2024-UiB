@@ -4,7 +4,7 @@ CC = gcc
 CFLAGS = -g -std=gnu17 -O3 -march=native -I include
 
 OBJ_EXACT = main_exact.o graph.o ocm.o bnb.o heuristics.o
-OBJ_HEURISTIC = main_heuristic.o
+OBJ_HEURISTIC = main_heuristic.o graph.o heuristics.o ocm.o
 OBJ_UTIL = main_util.o graph.o ocm.o
 
 OBJ_EXACT := $(addprefix bin/, $(OBJ_EXACT))
@@ -25,7 +25,7 @@ exact : $(OBJ_EXACT)
 	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 heuristic : $(OBJ_HEURISTIC)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 util : $(OBJ_UTIL)
 	$(CC) $(CFLAGS) -o $@ $^

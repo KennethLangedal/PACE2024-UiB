@@ -4,6 +4,8 @@
 
 int number_of_crossings(graph g, int u, int v);
 
+int *lift_solution_degree_one(graph g, graph r, int *s);
+
 int **init_cost_matrix(graph g);
 
 void free_cost_matrix(int **cm);

@@ -29,6 +29,31 @@ int number_of_crossings(graph g, int u, int v)
     return crossings;
 }
 
+int *lift_solution_degree_one(graph g, graph r, int *s)
+{
+    int *sl = malloc(sizeof(int) * g.B);
+    if (g.B == r.B)
+    {
+        for (int i = 0; i < r.B; i++)
+            sl[i] = s[i];
+        return sl;
+    }
+
+    int p = 0;
+    for (int i = 0; i < g.A; i++)
+    {
+        int new_p = p;
+        int best_cost = 0;
+
+        for (int j = g.V[i]; j < g.V[i + 1]; j++)
+        {
+            if (g.V[g.E[j] + 1] - g.V[g.E[j]] == 1)
+            {
+            }
+        }
+    }
+}
+
 int **init_cost_matrix(graph g)
 {
     int *data = malloc(sizeof(int) * g.B * g.B);

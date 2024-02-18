@@ -1,5 +1,6 @@
 #include "bnb.h"
 #include "ocm.h"
+#include "heuristics.h"
 
 #include <stdlib.h>
 
@@ -130,12 +131,17 @@ void bb(int **cm, int **tc, int N, int crossings, int **sol, int *ub, int d)
     free_tc(_tc);
 }
 
-#include "heuristics.h"
-
 int *solve_cc(graph g)
 {
     if (g.B == 0)
         return NULL;
+
+    if (g.B == 1)
+    {
+        int *s = malloc(sizeof(int));
+        s[0] = g.A;
+        return s;
+    }
 
     int **cm = init_cost_matrix(g);
     int **tc = init_tc(g.B);
@@ -155,9 +161,10 @@ int *solve_cc(graph g)
     // store_graph(f, g);
     // fclose(f);
 
+    cost = heur + 1;
     bb(cm, tc, g.B, 0, sol, &cost, 0);
 
-    printf("solved %d instance (%d)\n", g.B, cost);
+    printf("\nsolved %d instance (%d)\n", g.B, cost);
 
     // Give order to equal pairs
     for (int i = 0; i < g.B; i++)
