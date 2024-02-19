@@ -41,63 +41,51 @@ int lock_in_k(int **cm, int **tc, int N, int crossings, int ub)
 
 void bb(int **cm, int **tc, int N, int crossings, int **sol, int *ub, int d)
 {
-    if (crossings + lower_bound(cm, tc, N) >= *ub)
+    int lb = lower_bound(cm, tc, N);
+
+    // printf("\r%d %d %d", lb + crossings, *ub, d);
+    // fflush(stdout);
+
+    if (crossings + lb >= *ub)
         return;
 
-    // crossings = lock_in_k(cm, tc, N, crossings, *ub);
-
-    // find good pair
+    // find good pair and lock in forced
     int u = -1, v = -1;
     int best = 0;
     for (int i = 0; i < N; i++)
     {
         for (int j = i + 1; j < N; j++)
         {
-            if (tc[i][j] == 0 && tc[j][i] == 0 && cm[i][j] != cm[j][i])
+            if (!tc[i][j] && !tc[j][i] && cm[i][j] != cm[j][i])
             {
-                int cost_p = tc_try_add_edge(tc, N, i, j, cm);
-                int cost_n = tc_try_add_edge(tc, N, j, i, cm);
-                int cost = cost_p < cost_n ? cost_p : cost_n;
-                if (u < 0 || cost > best)
+                int f = i, l = j;
+                if (cm[j][i] < cm[i][j])
+                    f = j, l = i;
+
+                // if (crossings + (lb - cm[f][l]) + cm[l][f] >= *ub) // k-rule
+                // {
+                //     crossings += tc_add_edge(tc, tc, N, f, l, cm);
+                //     lb = lower_bound(cm, tc, N);
+                // }
+                if (u < 0 || cm[l][f] - cm[f][l] > best)
                 {
-                    if (cost_p < cost_n)
-                        u = i, v = j;
-                    else
-                        u = j, v = i;
-                    best = cost;
+                    u = l, v = f;
+                    best = cm[l][f] - cm[f][l];
                 }
             }
         }
     }
 
+    if (crossings + lb >= *ub)
+        return;
+
     if (u < 0 && v < 0)
     {
-        int unset = 0;
-        for (int i = 0; i < N; i++)
-            for (int j = i + 1; j < N; j++)
-                if (tc[i][j] == tc[j][i])
-                    unset += cm[i][j];
-
-        if (crossings + unset < *ub)
+        if (crossings + lb < *ub)
         {
-            *ub = crossings + unset;
+            *ub = crossings + lb;
             for (int i = 0; i < N * N; i++)
                 (*sol)[i] = (*tc)[i];
-
-            int sanity_check = 0;
-            for (int i = 0; i < N; i++)
-            {
-                for (int j = i + 1; j < N; j++)
-                {
-                    if (cm[i][j] != cm[j][i] && sol[i][j] == sol[j][i])
-                        printf("Error\n");
-                    if (sol[i][j])
-                        sanity_check += cm[i][j];
-                    else
-                        sanity_check += cm[j][i];
-                }
-            }
-            // printf("%d %d %d\n", crossings + unset, sanity_check, d);
         }
         return;
     }
@@ -105,15 +93,15 @@ void bb(int **cm, int **tc, int N, int crossings, int **sol, int *ub, int d)
     bc++;
     if (d < 400)
         lr[d] = 0;
-    if (!(bc % 100))
-    {
-        bc = 0;
-        printf("\r");
-        printf("%d ", *ub);
-        for (int i = 0; i < 100; i++)
-            printf("%d", lr[i]);
-        fflush(stdout);
-    }
+    // if (!(bc % 100))
+    // {
+    //     bc = 0;
+    //     printf("\r");
+    //     printf("%d ", *ub);
+    //     for (int i = 0; i < 150; i++)
+    //         printf("%d", lr[i]);
+    //     fflush(stdout);
+    // }
 
     int **_tc = init_tc(N);
 
@@ -133,38 +121,21 @@ void bb(int **cm, int **tc, int N, int crossings, int **sol, int *ub, int d)
 
 int *solve_cc(graph g)
 {
-    if (g.B == 0)
-        return NULL;
-
-    if (g.B == 1)
-    {
-        int *s = malloc(sizeof(int));
-        s[0] = g.A;
-        return s;
-    }
-
     int **cm = init_cost_matrix(g);
     int **tc = init_tc(g.B);
+
     int **sol = init_tc(g.B);
+    int ub = simulated_annealing_cm(cm, sol, g.B);
 
     tc_add_trivial(tc, cm, g.B);
-    tc_add_independent(tc, cm, g.B);
+    int cost = tc_add_independent(tc, cm, g.B);
+    cost = lock_in_k(cm, tc, g.B, cost, ub);
 
-    tc_add_trivial(sol, cm, g.B);
-    tc_add_independent(tc, cm, g.B);
-    int cost = upper_bound(cm, sol, g.B);
+    printf("solving %d instance (%d)\n", g.B, ub);
 
-    int heur = greedy_placement(g.B, cm);
+    bb(cm, tc, g.B, cost, sol, &ub, 0);
 
-    printf("solving %d instance (%d)(%d)\n", g.B, cost, heur);
-    // FILE *f = fopen("p.gr", "w");
-    // store_graph(f, g);
-    // fclose(f);
-
-    cost = heur + 1;
-    bb(cm, tc, g.B, 0, sol, &cost, 0);
-
-    printf("\nsolved %d instance (%d)\n", g.B, cost);
+    printf("\nsolved %d instance (%d)\n", g.B, ub);
 
     // Give order to equal pairs
     for (int i = 0; i < g.B; i++)
@@ -177,121 +148,20 @@ int *solve_cc(graph g)
 
     int *s = malloc(sizeof(int) * g.B);
     for (int i = 0; i < g.B; i++)
+        s[i] = -1;
+
+    for (int i = 0; i < g.B; i++)
     {
         int d = 0;
         for (int j = 0; j < g.B; j++)
             if (sol[i][j])
                 d++;
+        if (s[g.B - d - 1] >= 0)
+            printf("Duplicate output\n");
         s[g.B - d - 1] = i + g.A;
     }
 
     free_tc(sol);
-
-    return s;
-}
-
-int *solve_post_degree_one(graph g)
-{
-    int N = 0;
-    graph *cc = split_graph(g, &N);
-
-    int *s = malloc(sizeof(int) * g.B);
-    int p = 0;
-
-    for (int i = 0; i < N; i++)
-    {
-        int *_s = solve_cc(cc[i]);
-        for (int j = 0; j < cc[i].B; j++)
-            s[p++] = cc[i].old_label[_s[j]];
-        free(_s);
-        free_graph(cc[i]);
-    }
-    free(cc);
-
-    return s;
-}
-
-int *find_degree_one(graph g, int nd)
-{
-    int *d = malloc(sizeof(int) * nd);
-
-    int p = 0;
-    for (int u = 0; u < g.A; u++)
-    {
-        for (int i = g.V[u]; i < g.V[u + 1]; i++)
-        {
-            int v = g.E[i];
-            if (g.V[v + 1] - g.V[v] == 1)
-                d[p++] = v;
-        }
-    }
-
-    for (int u = g.A; u < g.N; u++)
-    {
-        if (g.V[u + 1] - g.V[u] == 0)
-            d[p++] = u;
-    }
-
-    return d;
-}
-
-int *solve_post_twin_removal(graph g)
-{
-    graph _g = remove_degree_one(g);
-
-    int *_s = solve_post_degree_one(_g);
-    for (int i = 0; i < _g.B; i++)
-        _s[i] = _g.old_label[_s[i]];
-
-    if (g.B == _g.B)
-    {
-        free_graph(_g);
-        return _s;
-    }
-
-    int *_d = find_degree_one(g, g.B - _g.B);
-
-    int *s = malloc(sizeof(int) * g.B);
-
-    // Merge
-
-    int p = 0, p1 = 0, p2 = 0;
-    while (p < g.B && p1 < _g.B && p2 < g.B - _g.B)
-    {
-        int i = p;
-        int cost = 0;
-        for (int j = p1; j < _g.B; j++)
-            cost += number_of_crossings(g, _d[p2], _s[j]);
-
-        int best = p1;
-        int best_cost = cost;
-        for (int j = p1; j < _g.B; j++)
-        {
-            cost -= number_of_crossings(g, _d[p2], _s[j]);
-            cost += number_of_crossings(g, _s[j], _d[p2]);
-            if (cost < best_cost)
-            {
-                best = j + 1;
-                best_cost = cost;
-            }
-        }
-
-        for (int j = p1; j < best; j++)
-            s[p++] = _s[j];
-        p1 += best - p1;
-
-        s[p++] = _d[p2++];
-    }
-
-    while (p1 < _g.B)
-        s[p++] = _s[p1++];
-
-    while (p2 < g.B - _g.B)
-        s[p++] = _d[p2++];
-
-    free_graph(_g);
-    free(_s);
-    free(_d);
 
     return s;
 }
@@ -307,23 +177,40 @@ void add_twins(graph g, int u, int *s, int *p)
 
 int *solve_bnb(graph g)
 {
-    graph _g = remove_twins(g);
+    printf("%d\n", g.B);
+    graph gz = remove_degree_zero(g);
+    printf("%d\n", gz.B);
+    graph gt = remove_twins(gz);
+    printf("%d\n", gt.B);
+    int N = 0;
+    graph *cc = split_graph(gt, &N);
 
-    int *_s = solve_post_twin_removal(_g);
-
-    int *s = malloc(sizeof(int) * g.B);
-
+    int *s = malloc(sizeof(int) * gt.B);
     int p = 0;
-    for (int i = 0; i < _g.B; i++)
+    for (int i = 0; i < N; i++)
     {
-        int u = _s[i];
-        s[p++] = _g.old_label[u];
-        if (_g.twins[u] > 0)
-            add_twins(g, _g.old_label[u], s, &p);
+        if (cc[i].B > 1)
+        {
+            int *s_cc = solve_cc(cc[i]);
+            for (int j = 0; j < cc[i].B; j++)
+                s[p++] = cc[i].old_label[s_cc[j]];
+
+            free(s_cc);
+        }
+        else if (cc[i].B == 1)
+        {
+            s[p++] = cc[i].old_label[cc[i].A];
+        }
+        free_graph(cc[i]);
     }
 
-    free_graph(_g);
-    free(_s);
+    lift_solution_twins(gz, gt, &s);
+    lift_solution_degree_zero(g, gz, &s);
+
+    free_graph(gz);
+    free_graph(gt);
+    free(cc);
+
     return s;
 }
 
@@ -339,6 +226,73 @@ int lower_bound(int **cm, int **tc, int N)
         }
     }
     return lb;
+}
+
+int lower_bound_improved(int **cm, int **tc, int N)
+{
+    int **set_pairs = malloc(sizeof(int *) * N);
+    *set_pairs = malloc(sizeof(int) * N * N);
+    for (int i = 0; i < N; i++)
+        set_pairs[i] = (*set_pairs) + N * i;
+
+    for (int i = 0; i < N; i++)
+        for (int j = 0; j < N; j++)
+            set_pairs[i][j] = 0;
+
+    for (int i = 0; i < N; i++)
+        for (int j = i + 1; j < N; j++)
+            set_pairs[i][j] = tc[i][j] || tc[j][i];
+
+    int crossings = 0;
+    for (int u = 0; u < N; u++)
+    {
+        for (int v = u + 1; v < N; v++)
+        {
+            if (set_pairs[u][v])
+                continue;
+
+            int f = u, l = v;
+            if (cm[v][u] < cm[u][v])
+                f = v, l = u;
+
+            for (int w = v + 1; w < N; w++)
+            {
+                if (set_pairs[u][w] || set_pairs[v][w])
+                    continue;
+
+                if (cm[l][w] < cm[w][l] && cm[w][f] < cm[f][w])
+                {
+                    // Found cycle
+                    set_pairs[u][v] = 1;
+                    set_pairs[v][w] = 1;
+                    set_pairs[u][w] = 1;
+
+                    int flw = cm[f][l] + cm[l][w] + cm[f][w];
+                    int wfl = cm[w][f] + cm[f][l] + cm[w][l];
+                    int lwf = cm[l][w] + cm[w][f] + cm[l][f];
+
+                    if (flw < wfl && flw < lwf)
+                        crossings += flw;
+                    else if (wfl < lwf)
+                        crossings += wfl;
+                    else
+                        crossings += lwf;
+
+                    break;
+                }
+            }
+            if (set_pairs[u][v])
+                continue;
+
+            set_pairs[u][v] = 1;
+            crossings += cm[f][l];
+        }
+    }
+
+    free(*set_pairs);
+    free(set_pairs);
+
+    return crossings;
 }
 
 int upper_bound(int **cm, int **tc, int N)

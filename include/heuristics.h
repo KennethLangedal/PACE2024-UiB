@@ -2,6 +2,6 @@
 
 #include "graph.h"
 
-int greedy_placement(int N, int **cm);
+int simulated_annealing_cm(int **cm, int **tc, int N);
 
 int simulated_annealing(graph g, int *s);

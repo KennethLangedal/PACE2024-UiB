@@ -3,12 +3,12 @@
 #include <stdlib.h>
 #include <assert.h>
 
-int number_of_crossings(graph g, int u, int v)
+int64_t number_of_crossings(graph g, int u, int v)
 {
     if (u == v)
         return 0;
 
-    int crossings = 0;
+    int64_t crossings = 0;
 
     int i = g.V[u];
     int j = g.V[v];
@@ -29,29 +29,45 @@ int number_of_crossings(graph g, int u, int v)
     return crossings;
 }
 
-int *lift_solution_degree_one(graph g, graph r, int *s)
+void lift_solution_twins(graph g, graph r, int **s)
 {
     int *sl = malloc(sizeof(int) * g.B);
-    if (g.B == r.B)
-    {
-        for (int i = 0; i < r.B; i++)
-            sl[i] = s[i];
-        return sl;
-    }
 
     int p = 0;
-    for (int i = 0; i < g.A; i++)
+    for (int i = 0; i < r.B; i++)
     {
-        int new_p = p;
-        int best_cost = 0;
-
-        for (int j = g.V[i]; j < g.V[i + 1]; j++)
+        int u = r.old_label[(*s)[i]];
+        sl[p++] = u;
+        if (r.twins[(*s)[i]] > 0)
         {
-            if (g.V[g.E[j] + 1] - g.V[g.E[j]] == 1)
+            int w = g.E[g.V[u]];
+            for (int j = g.V[w]; j < g.V[w + 1]; j++)
             {
+                int v = g.E[j];
+                if (u != v && test_twin(g, u, v))
+                    sl[p++] = v;
             }
         }
     }
+
+    free(*s);
+    *s = sl;
+}
+
+void lift_solution_degree_zero(graph g, graph r, int **s)
+{
+    int *sl = malloc(sizeof(int) * g.B);
+
+    int p = 0;
+    for (int i = 0; i < r.B; i++)
+        sl[p++] = r.old_label[(*s)[i]];
+
+    for (int u = g.A; u < g.N; u++)
+        if (g.V[u + 1] - g.V[u] < 1)
+            sl[p++] = u;
+
+    free(*s);
+    *s = sl;
 }
 
 int **init_cost_matrix(graph g)
@@ -112,8 +128,9 @@ void tc_add_trivial(int **tc, int **cm, int N)
     }
 }
 
-void tc_add_independent(int **tc, int **cm, int N)
+int tc_add_independent(int **tc, int **cm, int N)
 {
+    int cost = 0;
     for (int i = 0; i < N; i++)
     {
         int c = 0;
@@ -136,13 +153,15 @@ void tc_add_independent(int **tc, int **cm, int N)
                 if (!tc[i][j] && !tc[j][i])
                 {
                     if (cm[i][j] < cm[j][i])
-                        tc_add_edge(tc, tc, N, i, j, cm);
+                        cost += tc_add_edge(tc, tc, N, i, j, cm);
                     else
-                        tc_add_edge(tc, tc, N, j, i, cm);
+                        cost += tc_add_edge(tc, tc, N, j, i, cm);
                 }
             }
         }
     }
+
+    return cost;
 }
 
 int tc_try_add_edge(int **tc, int N, int u, int v, int **cm)

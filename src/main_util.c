@@ -1,8 +1,17 @@
 #include "graph.h"
 #include "ocm.h"
+#include "bnb.h"
+#include "heuristics.h"
 
 #include <stdlib.h>
 #include <stdio.h>
+
+static inline int natural_order(int **cm, int N, int u, int v)
+{
+    if (cm[u][v] == 0 || cm[v][u] == 0)
+        return 0;
+    return cm[u][v] < cm[v][u];
+}
 
 int main(int argc, char **argv)
 {
@@ -10,79 +19,27 @@ int main(int argc, char **argv)
     graph g = parse_graph(f);
     fclose(f);
 
-    // if (validate_graph(g))
-    //     printf("%d %d %d %d\n", g.N, g.V[g.N], g.A, g.B);
-    // else
-    //     printf("Error in graph\n");
+    printf("%s %d ", argv[1], g.B);
+    graph gz = remove_degree_zero(g);
+    printf("%d ", gz.B);
+    graph gt = remove_twins(gz);
+    printf("%d ", gt.B);
 
-    graph g1 = remove_degree_one(g);
-    if (g1.B <= 1)
-        return 0;
-    // if (validate_graph(g1))
-    //     printf("%d %d %d %d\n", g1.N, g1.V[g1.N], g1.A, g1.B);
-    // else
-    //     printf("Error in graph after degree 1 removal\n");
+    int N = 0;
+    graph *cc = split_graph(gt, &N);
 
-    graph g2 = remove_twins(g1);
-    if (g1.B <= 1)
-        return 0;
-    // if (validate_graph(g2))
-    //     printf("%d %d %d %d\n", g2.N, g2.V[g2.N], g2.A, g2.B);
-    // else
-    //     printf("Error in graph after twin removal\n");
-
-    int N;
-    graph *cc = split_graph(g2, &N);
-
-    int max_B = 0;
+    int max = 0;
     for (int i = 0; i < N; i++)
-    {
-        if (cc[i].B > cc[max_B].B)
-            max_B = i;
-    }
+        if (cc[i].B > cc[max].B)
+            max = i;
 
-    graph lc = cc[max_B];
-    if (lc.B <= 1)
-        return 0;
+    int **cm = init_cost_matrix(cc[max]);
+    int **tc = init_tc(cc[max].B);
+    int lb = lower_bound(cm, tc, cc[max].B);
+    int lb_imp = lower_bound_improved(cm, tc, cc[max].B);
+    int ub = simulated_annealing_cm(cm, tc, cc[max].B);
 
-    int **cm = init_cost_matrix(lc);
-    int **tc = init_tc(lc.B);
-    tc_add_trivial(tc, cm, lc.B);
-    tc_add_independent(tc, cm, lc.B);
-
-    int decided = 0, undecided = 0;
-    for (int i = 0; i < lc.B; i++)
-    {
-        for (int j = i + 1; j < lc.B; j++)
-        {
-            if (tc[i][j] || tc[j][i])
-                decided++;
-            else
-                undecided++;
-        }
-    }
-
-    int removable = 0;
-    for (int i = 0; i < lc.B; i++)
-    {
-        int c = 0;
-        for (int j = 0; j < lc.B; j++)
-        {
-            if (i != j && (tc[i][j] || tc[j][i]))
-                c++;
-        }
-        if (c == lc.B - 1)
-            removable++;
-    }
-
-    printf("%d %d %.2lf%%\n", lc.B - removable, undecided, (double)decided / (double)(decided + undecided) * 100.0);
-
-    free_graph(g);
-    free_graph(g1);
-    free_graph(g2);
-    for (int i = 0; i < N; i++)
-        free_graph(cc[i]);
-    free(cc);
+    printf("%d %d %d %d\n", cc[max].B, lb, lb_imp, ub);
 
     return 0;
 }

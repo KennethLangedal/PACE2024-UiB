@@ -198,7 +198,7 @@ graph subgraph(graph g, int *mask)
     return sg;
 }
 
-graph remove_degree_one(graph g)
+graph remove_degree_zero(graph g)
 {
     int *mask = malloc(sizeof(int) * g.N);
     for (int i = 0; i < g.N; i++)
@@ -206,7 +206,7 @@ graph remove_degree_one(graph g)
 
     for (int i = g.A; i < g.N; i++)
     {
-        if (g.V[i + 1] - g.V[i] <= 1)
+        if (g.V[i + 1] - g.V[i] < 1)
             continue;
 
         mask[i] = 1;
@@ -325,11 +325,16 @@ graph remove_twins(graph g)
 
     for (int u = g.A; u < g.N; u++)
     {
-        if (!mask[u])
+        if (!mask[u] || g.V[u + 1] - g.V[u] < 1)
             continue;
 
-        for (int v = u + 1; v < g.N; v++)
+        int w = g.E[g.V[u]];
+        for (int i = g.V[w]; i < g.V[w + 1]; i++)
         {
+            int v = g.E[i];
+            if (v <= u)
+                continue;
+
             if (test_twin(g, u, v))
             {
                 g.twins[u]++;
