@@ -117,13 +117,9 @@ graph parse_graph(FILE *f)
     munmap(data, size);
 
     g.old_label = malloc(sizeof(int) * g.N);
-    g.twins = malloc(sizeof(int) * g.N);
 
     for (int i = 0; i < g.N; i++)
-    {
         g.old_label[i] = i;
-        g.twins[i] = 0;
-    }
 
     make_simple(g.N, g.V, &g.E);
 
@@ -168,9 +164,7 @@ graph subgraph(graph g, int *mask)
 
     sg.V = malloc(sizeof(int) * (sg.N + 1));
     sg.E = malloc(sizeof(int) * M);
-
     sg.old_label = malloc(sizeof(int) * sg.N);
-    sg.twins = malloc(sizeof(int) * sg.N);
 
     sg.V[0] = 0;
     for (int i = 0; i < g.N; i++)
@@ -180,7 +174,6 @@ graph subgraph(graph g, int *mask)
 
         int u = new_label[i];
         sg.old_label[u] = i;
-        sg.twins[u] = g.twins[i];
 
         int degree = 0;
         for (int j = g.V[i]; j < g.V[i + 1]; j++)
@@ -317,43 +310,11 @@ int test_twin(graph g, int u, int v)
     return twin;
 }
 
-graph remove_twins(graph g)
-{
-    int *mask = malloc(sizeof(int) * g.N);
-    for (int i = 0; i < g.N; i++)
-        mask[i] = 1;
-
-    for (int u = g.A; u < g.N; u++)
-    {
-        if (!mask[u] || g.V[u + 1] - g.V[u] < 1)
-            continue;
-
-        int w = g.E[g.V[u]];
-        for (int i = g.V[w]; i < g.V[w + 1]; i++)
-        {
-            int v = g.E[i];
-            if (v <= u)
-                continue;
-
-            if (test_twin(g, u, v))
-            {
-                g.twins[u]++;
-                mask[v] = 0;
-            }
-        }
-    }
-
-    graph sg = subgraph(g, mask);
-    free(mask);
-    return sg;
-}
-
 void free_graph(graph g)
 {
     free(g.V);
     free(g.E);
     free(g.old_label);
-    free(g.twins);
 }
 
 int validate_graph(graph g)

@@ -4,24 +4,49 @@
 
 #include <stdint.h>
 
-int64_t number_of_crossings(graph g, int u, int v);
+typedef struct
+{
+    int N;
+    int **cm, **tc;
+    int crossings, lb;
+    int undecided, equal;
+} ocm;
 
-void lift_solution_twins(graph g, graph r, int **s);
+ocm init_ocm_problem(graph g);
+
+void free_ocm_problem(ocm p);
+
+// Reduction rules
+
+void ocm_reduction_trivial(ocm *p);
+
+void ocm_reduction_2_1(graph g, ocm *p);
+
+void ocm_reduction_twins(graph g, ocm *p);
+
+void ocm_reduction_independent(ocm *p);
+
+void ocm_reduction_k_quick(ocm *p, int ub);
+
+void ocm_reduction_k_full(ocm *p, int ub);
+
+// B&B tools
+
+// Returns the number of extra crossings above lb
+int ocm_try_edge(ocm p, int u, int v);
+
+void ocm_add_edge(ocm *p, int u, int v);
+
+// Util
+
+int64_t count_crossings_pair(graph g, int u, int v);
+
+int64_t count_crossings_solution(graph g, int *s);
 
 void lift_solution_degree_zero(graph g, graph r, int **s);
 
-int **init_cost_matrix(graph g);
+int count_relevant_vertices(ocm p);
 
-void free_cost_matrix(int **cm);
+void ocm_copy_tc(ocm s, ocm *d);
 
-int **init_tc(int N);
-
-void tc_add_trivial(int **tc, int **cm, int N);
-
-int tc_add_independent(int **tc, int **cm, int N);
-
-int tc_try_add_edge(int **tc, int N, int u, int v, int **cm);
-
-int tc_add_edge(int **tc, int **tc_next, int N, int u, int v, int **cm);
-
-int **free_tc(int **tc);
+void ocm_copy_full(ocm s, ocm *d);

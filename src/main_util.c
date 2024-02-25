@@ -1,17 +1,9 @@
 #include "graph.h"
 #include "ocm.h"
-#include "bnb.h"
 #include "heuristics.h"
 
 #include <stdlib.h>
 #include <stdio.h>
-
-static inline int natural_order(int **cm, int N, int u, int v)
-{
-    if (cm[u][v] == 0 || cm[v][u] == 0)
-        return 0;
-    return cm[u][v] < cm[v][u];
-}
 
 int main(int argc, char **argv)
 {
@@ -19,27 +11,33 @@ int main(int argc, char **argv)
     graph g = parse_graph(f);
     fclose(f);
 
-    printf("%s %d ", argv[1], g.B);
     graph gz = remove_degree_zero(g);
-    printf("%d ", gz.B);
-    graph gt = remove_twins(gz);
-    printf("%d ", gt.B);
 
-    int N = 0;
-    graph *cc = split_graph(gt, &N);
-
-    int max = 0;
+    int N;
+    graph *cc = split_graph(gz, &N);
     for (int i = 0; i < N; i++)
-        if (cc[i].B > cc[max].B)
-            max = i;
+    {
+        if (cc[i].B < 2)
+            continue;
 
-    int **cm = init_cost_matrix(cc[max]);
-    int **tc = init_tc(cc[max].B);
-    int lb = lower_bound(cm, tc, cc[max].B);
-    int lb_imp = lower_bound_improved(cm, tc, cc[max].B);
-    int ub = simulated_annealing_cm(cm, tc, cc[max].B);
+        ocm p = init_ocm_problem(cc[i]);
+        ocm_reduction_trivial(&p);
+        ocm_reduction_twins(cc[i], &p);
+        ocm_reduction_2_1(cc[i], &p);
+        ocm_reduction_independent(&p);
 
-    printf("%d %d %d %d\n", cc[max].B, lb, lb_imp, ub);
+        int *s = malloc(sizeof(int) * p.N);
+        int ub = simulated_annealing(cc[i], s);
+        free(s);
 
+        ocm_reduction_k_full(&p, ub);
+
+        printf("%d %d (%d %d) %d %d %d %d\n", p.N, p.crossings + p.lb, p.crossings, p.lb, ub, p.equal, p.undecided, count_relevant_vertices(p));
+
+        free_ocm_problem(p);
+    }
+
+    free_graph(g);
+    free_graph(gz);
     return 0;
 }

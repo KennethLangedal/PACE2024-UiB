@@ -3,4 +3,5 @@ heuristic
 util
 bin/*.o
 bin/*.d
-instances/reduced/*
+.vscode/*
+solutions/*

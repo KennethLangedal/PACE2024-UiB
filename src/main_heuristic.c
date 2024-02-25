@@ -13,6 +13,7 @@ int main(int argc, char **argv)
     int *s = malloc(sizeof(int) * g.B);
     int k = simulated_annealing(g, s);
     printf("%d\n", k);
+
     f = fopen(argv[2], "w");
     for (int i = 0; i < g.B; i++)
         fprintf(f, "%d\n", s[i] + 1);

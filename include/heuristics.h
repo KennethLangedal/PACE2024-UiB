@@ -1,7 +1,8 @@
 #pragma once
 
 #include "graph.h"
+#include "ocm.h"
 
-int simulated_annealing_cm(int **cm, int **tc, int N);
+void ocm_simulated_annealing(ocm *p);
 
 int simulated_annealing(graph g, int *s);

@@ -5,7 +5,7 @@ CFLAGS = -g -std=gnu17 -O3 -march=native -I include
 
 OBJ_EXACT = main_exact.o graph.o ocm.o bnb.o heuristics.o
 OBJ_HEURISTIC = main_heuristic.o graph.o heuristics.o ocm.o
-OBJ_UTIL = main_util.o graph.o ocm.o bnb.o heuristics.o
+OBJ_UTIL = main_util.o graph.o ocm.o heuristics.o
 
 OBJ_EXACT := $(addprefix bin/, $(OBJ_EXACT))
 OBJ_HEURISTIC := $(addprefix bin/, $(OBJ_HEURISTIC))

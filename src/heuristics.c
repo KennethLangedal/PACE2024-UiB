@@ -4,19 +4,19 @@
 #include <stdlib.h>
 #include <math.h>
 
-int simulated_annealing_cm(int **cm, int **tc, int N)
+void ocm_simulated_annealing(ocm *p)
 {
-    int *s = malloc(sizeof(int) * N);
-    for (int i = 0; i < N; i++)
+    int *s = malloc(sizeof(int) * p->N);
+    for (int i = 0; i < p->N; i++)
         s[i] = i;
 
-    if (N < 2)
-        return 0;
+    if (p->N < 2)
+        return;
 
     int64_t cost = 0;
-    for (int i = 0; i < N; i++)
-        for (int j = i + 1; j < N; j++)
-            cost += cm[s[i]][s[j]];
+    for (int i = 0; i < p->N; i++)
+        for (int j = i + 1; j < p->N; j++)
+            cost += p->cm[s[i]][s[j]];
 
     double t = 0.9;
     int it = 200;
@@ -25,9 +25,9 @@ int simulated_annealing_cm(int **cm, int **tc, int N)
     {
         for (int k = 0; k < it; k++)
         {
-            int i = rand() % (N - 1);
-            int64_t current_cost = cm[s[i]][s[i + 1]];
-            int64_t alt_cost = cm[s[i + 1]][s[i]];
+            int i = rand() % (p->N - 1);
+            int64_t current_cost = p->cm[s[i]][s[i + 1]];
+            int64_t alt_cost = p->cm[s[i + 1]][s[i]];
             double diff = current_cost - alt_cost;
             if (diff >= 0 || exp(diff / t) > drand48())
             {
@@ -41,17 +41,20 @@ int simulated_annealing_cm(int **cm, int **tc, int N)
         t *= 0.9999;
     }
 
-    for (int i = 0; i < N; i++)
-        for (int j = 0; j < N; j++)
-            tc[i][j] = 0;
+    for (int i = 0; i < p->N; i++)
+        for (int j = 0; j < p->N; j++)
+            p->tc[i][j] = 0;
 
-    for (int i = 0; i < N; i++)
-        for (int j = i + 1; j < N; j++)
-            tc[s[i]][s[j]] = 1;
+    for (int i = 0; i < p->N; i++)
+        for (int j = i + 1; j < p->N; j++)
+            p->tc[s[i]][s[j]] = 1;
 
     free(s);
 
-    return cost;
+    p->equal = 0;
+    p->undecided = 0;
+    p->crossings = cost;
+    p->lb = 0;
 }
 
 int simulated_annealing(graph g, int *s)
@@ -65,18 +68,18 @@ int simulated_annealing(graph g, int *s)
     int64_t cost = 0;
     for (int i = 0; i < g.B; i++)
         for (int j = i + 1; j < g.B; j++)
-            cost += number_of_crossings(g, s[i], s[j]);
+            cost += count_crossings_pair(g, s[i], s[j]);
 
     double t = 0.9;
-    int it = 200;
+    int it = 400;
 
     while (t > 0.001)
     {
         for (int k = 0; k < it; k++)
         {
             int i = rand() % (g.B - 1);
-            int64_t current_cost = number_of_crossings(g, s[i], s[i + 1]);
-            int64_t alt_cost = number_of_crossings(g, s[i + 1], s[i]);
+            int64_t current_cost = count_crossings_pair(g, s[i], s[i + 1]);
+            int64_t alt_cost = count_crossings_pair(g, s[i + 1], s[i]);
             double diff = current_cost - alt_cost;
             if (diff >= 0 || exp(diff / t) > drand48())
             {

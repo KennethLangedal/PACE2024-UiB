@@ -1,5 +1,6 @@
 #include "bnb.h"
 #include "graph.h"
+#include "ocm.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,6 +14,9 @@ int main(int argc, char **argv)
     fclose(f);
 
     int *s = solve_bnb(g);
+
+    // printf("%d\n", count_crossings(g, s));
+
     f = fopen(argv[2], "w");
     for (int i = 0; i < g.B; i++)
         fprintf(f, "%d\n", s[i] + 1);

@@ -7,7 +7,7 @@ typedef struct
     int N, A, B;
     int *V, *E;
 
-    int *old_label, *twins;
+    int *old_label;
 } graph;
 
 graph parse_graph(FILE *f);
@@ -19,8 +19,6 @@ int test_twin(graph g, int u, int v);
 graph subgraph(graph g, int *mask);
 
 graph remove_degree_zero(graph g);
-
-graph remove_twins(graph g);
 
 graph *split_graph(graph g, int *N);
 
