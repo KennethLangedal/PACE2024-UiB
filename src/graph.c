@@ -70,6 +70,12 @@ graph parse_graph(FILE *f)
 
     g.N = g.A + g.B;
 
+    if (data[i] != '\n' && data[i] != 13)
+    {
+        for (int j = 0; j < g.N; j++)
+            skip_line(data, &i);
+    }
+
     int *I = malloc(sizeof(int) * M);
     int *J = malloc(sizeof(int) * M);
 
@@ -116,10 +122,14 @@ graph parse_graph(FILE *f)
 
     munmap(data, size);
 
+    g.twins = malloc(sizeof(int) * g.N);
     g.old_label = malloc(sizeof(int) * g.N);
 
     for (int i = 0; i < g.N; i++)
+    {
+        g.twins[i] = 1;
         g.old_label[i] = i;
+    }
 
     make_simple(g.N, g.V, &g.E);
 
@@ -164,6 +174,7 @@ graph subgraph(graph g, int *mask)
 
     sg.V = malloc(sizeof(int) * (sg.N + 1));
     sg.E = malloc(sizeof(int) * M);
+    sg.twins = malloc(sizeof(int) * sg.N);
     sg.old_label = malloc(sizeof(int) * sg.N);
 
     sg.V[0] = 0;
@@ -173,6 +184,7 @@ graph subgraph(graph g, int *mask)
             continue;
 
         int u = new_label[i];
+        sg.twins[u] = g.twins[i];
         sg.old_label[u] = i;
 
         int degree = 0;
@@ -210,6 +222,62 @@ graph remove_degree_zero(graph g)
     graph sg = subgraph(g, mask);
 
     free(mask);
+
+    return sg;
+}
+
+graph remove_twins(graph g)
+{
+    int *mask = malloc(sizeof(int) * g.N);
+    int *twins = malloc(sizeof(int) * g.N);
+
+    for (int u = 0; u < g.N; u++)
+    {
+        mask[u] = 1;
+        twins[u] = 1;
+    }
+
+    for (int u = g.A; u < g.N; u++)
+    {
+        if (!mask[u])
+            continue;
+        int degree = g.V[u + 1] - g.V[u];
+        if (degree < 1)
+            continue;
+        int w = g.E[g.V[u]];
+
+        for (int k = g.V[w]; k < g.V[w + 1]; k++)
+        {
+            int v = g.E[k];
+            if (u == v || degree != g.V[v + 1] - g.V[v])
+                continue;
+
+            int twin = 1;
+            int i = g.V[u], j = g.V[v];
+            while (i < g.V[u + 1])
+            {
+                if (g.E[i] != g.E[j])
+                {
+                    twin = 0;
+                    break;
+                }
+                i++;
+                j++;
+            }
+            if (twin)
+            {
+                twins[u]++;
+                mask[v] = 0;
+            }
+        }
+    }
+
+    graph sg = subgraph(g, mask);
+    for (int u = 0; u < sg.N; u++)
+        sg.twins[u] = twins[sg.old_label[u]];
+
+    free(mask);
+    free(twins);
 
     return sg;
 }
@@ -268,7 +336,7 @@ graph *split_graph(graph g, int *N)
             {
                 if (g.V[j + 1] - g.V[j] == 1)
                 {
-                    if (g.E[g.V[j]] >= prev && g.E[g.V[j]] < i)
+                    if (g.E[g.V[j]] >= prev && (g.E[g.V[j]] < i || i == g.A - 1))
                         marks[j] = 1;
                 }
                 else if (g.E[g.V[j]] >= prev && g.E[g.V[j + 1] - 1] <= i)
@@ -314,6 +382,7 @@ void free_graph(graph g)
 {
     free(g.V);
     free(g.E);
+    free(g.twins);
     free(g.old_label);
 }
 
@@ -323,29 +392,32 @@ int validate_graph(graph g)
     for (int u = 0; u < g.N; u++)
     {
         if (g.V[u + 1] - g.V[u] < 0)
-            return 0;
+            return 2;
 
         M += g.V[u + 1] - g.V[u];
 
         for (int i = g.V[u]; i < g.V[u + 1]; i++)
         {
             if (i < 0 || i >= g.V[g.N])
-                return 0;
+                return 3;
 
             int v = g.E[i];
             if (v < 0 || v >= g.N || v == u || (i > g.V[u] && v <= g.E[i - 1]))
-                return 0;
+                return 4;
 
             if (bsearch(&u, g.E + g.V[v], g.V[v + 1] - g.V[v], sizeof(int), compare) == NULL)
-                return 0;
+                return 5;
 
             if ((u < g.A && v < g.A) || (u >= g.A && v >= g.A))
-                return 0;
+            {
+                printf("%d %d\n", u + 1, v + 1);
+                return 6;
+            }
         }
     }
 
     if (M != g.V[g.N])
-        return 0;
+        return 7;
 
     return 1;
 }

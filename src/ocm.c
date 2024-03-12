@@ -37,8 +37,39 @@ ocm init_ocm_problem(graph g)
         data[i] = 0;
 
     for (int i = 0; i < p.N; i++)
+        p.tc[i][i] = 1;
+
+    for (int i = 0; i < p.N; i++)
         for (int j = i + 1; j < p.N; j++)
             p.lb += p.cm[i][j] < p.cm[j][i] ? p.cm[i][j] : p.cm[j][i];
+
+    return p;
+}
+
+ocm copy_ocm_problem(ocm s)
+{
+    ocm p = {.crossings = s.crossings,
+             .lb = s.lb,
+             .undecided = s.undecided,
+             .equal = s.equal,
+             .N = s.N};
+
+    int *data = malloc(sizeof(int) * p.N * p.N);
+    p.cm = malloc(sizeof(int *) * p.N);
+
+    for (int i = 0; i < p.N; i++)
+        p.cm[i] = data + i * p.N;
+
+    for (int i = 0; i < p.N * p.N; i++)
+        p.cm[0][i] = s.cm[0][i];
+
+    data = malloc(sizeof(int) * p.N * p.N);
+    p.tc = malloc(sizeof(int *) * p.N);
+    for (int i = 0; i < p.N; i++)
+        p.tc[i] = data + i * p.N;
+
+    for (int i = 0; i < p.N * p.N; i++)
+        data[i] = s.tc[0][i];
 
     return p;
 }
@@ -116,39 +147,33 @@ void ocm_reduction_independent(ocm *p)
     if (p->N < 2)
         return;
 
-    for (int i = 0; i < p->N; i++)
+    int found = 1;
+    while (found)
     {
-        int c = 0;
-        int v = 0;
-        for (int j = 0; j < p->N; j++)
-        {
-            if (i == j)
-                continue;
+        found = 0;
 
-            if (p->tc[i][j] || p->tc[j][i])
-                c++;
-            else
-                v = j;
-        }
-
-        if (c == p->N - 2)
+        for (int i = 0; i < p->N; i++)
         {
-            c = 0;
+            int v = -1;
+            int c = 0;
             for (int j = 0; j < p->N; j++)
             {
-                if (v == j)
+                if (i == j || p->tc[i][j] || p->tc[j][i] || p->cm[i][j] == p->cm[j][i])
                     continue;
 
-                if (p->tc[v][j] || p->tc[j][v])
-                    c++;
+                v = j;
+                c++;
             }
-            if (c != p->N - 2)
-                continue;
 
-            if (p->cm[i][v] <= p->cm[v][i])
-                ocm_add_edge(p, i, v);
-            else
-                ocm_add_edge(p, v, i);
+            if (c == 1)
+            {
+                if (p->cm[i][v] <= p->cm[v][i])
+                    ocm_add_edge(p, i, v);
+                else
+                    ocm_add_edge(p, v, i);
+
+                found = 1;
+            }
         }
     }
 }
@@ -262,6 +287,51 @@ void ocm_add_edge(ocm *p, int u, int v)
     }
 }
 
+void ocm_add_edge_fast(ocm *p, int u, int v)
+{
+    for (int i = 0; i < p->N; i++)
+    {
+        if (i != u && p->tc[i][u] == 0)
+            continue;
+
+        for (int j = 0; j < p->N; j++)
+        {
+            p->tc[i][j] |= p->tc[v][j];
+        }
+    }
+}
+
+void ocm_update(ocm *p)
+{
+    p->equal = 0;
+    p->undecided = 0;
+    p->lb = 0;
+    p->crossings = 0;
+    for (int i = 0; i < p->N; i++)
+    {
+        for (int j = i + 1; j < p->N; j++)
+        {
+            if (p->tc[i][j] || p->tc[j][i])
+            {
+                if (p->tc[i][j])
+                    p->crossings += p->cm[i][j];
+                else
+                    p->crossings += p->cm[j][i];
+            }
+            else if (p->cm[i][j] == p->cm[j][i])
+            {
+                p->equal++;
+                p->lb += p->cm[i][j];
+            }
+            else
+            {
+                p->undecided++;
+                p->lb += p->cm[i][j] < p->cm[j][i] ? p->cm[i][j] : p->cm[j][i];
+            }
+        }
+    }
+}
+
 int64_t count_crossings_pair(graph g, int u, int v)
 {
     if (u == v)
@@ -283,7 +353,7 @@ int64_t count_crossings_pair(graph g, int u, int v)
             i++;
     }
 
-    return crossings;
+    return crossings * g.twins[u] * g.twins[v];
 }
 
 int64_t count_crossings_solution(graph g, int *s)
@@ -308,6 +378,32 @@ void lift_solution_degree_zero(graph g, graph r, int **s)
     for (int u = g.A; u < g.N; u++)
         if (g.V[u + 1] - g.V[u] < 1)
             sl[p++] = u;
+
+    free(*s);
+    *s = sl;
+}
+
+void lift_solution_twins(graph g, graph r, int **s)
+{
+    int *sl = malloc(sizeof(int) * g.B);
+
+    int p = 0;
+    for (int i = 0; i < r.B; i++)
+    {
+        int u = (*s)[i];
+        int _u = r.old_label[u];
+        sl[p++] = _u;
+        if (r.twins[u] > 1)
+        {
+            int _w = g.E[g.V[_u]];
+            for (int j = g.V[_w]; j < g.V[_w + 1]; j++)
+            {
+                int _v = g.E[j];
+                if (_u != _v && test_twin(g, _u, _v))
+                    sl[p++] = _v;
+            }
+        }
+    }
 
     free(*s);
     *s = sl;

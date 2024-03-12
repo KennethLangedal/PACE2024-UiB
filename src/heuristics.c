@@ -19,7 +19,7 @@ void ocm_simulated_annealing(ocm *p)
             cost += p->cm[s[i]][s[j]];
 
     double t = 0.9;
-    int it = 200;
+    int it = 100;
 
     while (t > 0.001)
     {
@@ -71,7 +71,7 @@ int simulated_annealing(graph g, int *s)
             cost += count_crossings_pair(g, s[i], s[j]);
 
     double t = 0.9;
-    int it = 400;
+    int it = 100;
 
     while (t > 0.001)
     {
@@ -90,7 +90,7 @@ int simulated_annealing(graph g, int *s)
                 s[i + 1] = t;
             }
         }
-        t *= 0.9999;
+        t *= 0.99;
     }
 
     return cost;

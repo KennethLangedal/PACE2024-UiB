@@ -14,6 +14,8 @@ typedef struct
 
 ocm init_ocm_problem(graph g);
 
+ocm copy_ocm_problem(ocm s);
+
 void free_ocm_problem(ocm p);
 
 // Reduction rules
@@ -37,13 +39,19 @@ int ocm_try_edge(ocm p, int u, int v);
 
 void ocm_add_edge(ocm *p, int u, int v);
 
+void ocm_add_edge_fast(ocm *p, int u, int v);
+
 // Util
+
+void ocm_update(ocm *p);
 
 int64_t count_crossings_pair(graph g, int u, int v);
 
 int64_t count_crossings_solution(graph g, int *s);
 
 void lift_solution_degree_zero(graph g, graph r, int **s);
+
+void lift_solution_twins(graph g, graph r, int **s);
 
 int count_relevant_vertices(ocm p);
 
