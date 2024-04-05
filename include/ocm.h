@@ -7,7 +7,8 @@
 typedef struct
 {
     int N;
-    int **cm, **tc;
+    int64_t **cm;
+    char **tc;
     int crossings, lb;
     int undecided, equal;
 } ocm;
@@ -40,6 +41,8 @@ int ocm_try_edge(ocm p, int u, int v);
 void ocm_add_edge(ocm *p, int u, int v);
 
 void ocm_add_edge_fast(ocm *p, int u, int v);
+
+void ocm_add_edge_avx(ocm *p, int u, int v);
 
 // Util
 

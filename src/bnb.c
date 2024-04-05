@@ -155,7 +155,7 @@ int *solve_cc_sat(graph g)
             int v = dp.E[i];
             if (dp.a[i] || p.tc[u][v] || p.tc[v][u])
                 continue;
-            ocm_add_edge_fast(&p, u, v);
+            ocm_add_edge_avx(&p, u, v);
         }
     }
     dfas_solve_cc(dp);
@@ -167,9 +167,9 @@ int *solve_cc_sat(graph g)
             if (p.tc[u][v] || p.tc[v][u])
                 continue;
             if (dp.a[i])
-                ocm_add_edge_fast(&p, u, v);
+                ocm_add_edge_avx(&p, u, v);
             else
-                ocm_add_edge_fast(&p, v, u);
+                ocm_add_edge_avx(&p, v, u);
         }
     }
     dfas_free(dp);
@@ -178,7 +178,7 @@ int *solve_cc_sat(graph g)
     for (int i = 0; i < g.B; i++)
         for (int j = i + 1; j < g.B; j++)
             if (!p.tc[i][j] && !p.tc[j][i])
-                ocm_add_edge_fast(&p, i, j);
+                ocm_add_edge_avx(&p, i, j);
 
     int *s = malloc(sizeof(int) * g.B);
     for (int i = 0; i < g.B; i++)

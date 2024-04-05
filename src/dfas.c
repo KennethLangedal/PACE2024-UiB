@@ -1,4 +1,5 @@
 #include "dfas.h"
+#include "ipamir.h"
 
 #include <string.h>
 #include <stdlib.h>
@@ -284,27 +285,14 @@ typedef struct
     int *V, *E;
 } cycles;
 
-void push_cycle(cycles *c, int N, int *cycle)
+void push_cycle(void *solver, int N, int *cycle)
 {
-    if (c->M + N >= c->ae)
-    {
-        c->ae *= 2;
-        c->E = realloc(c->E, sizeof(int) * c->ae);
-    }
-    if (c->N + 1 >= c->av)
-    {
-        c->av *= 2;
-        c->V = realloc(c->V, sizeof(int) * c->av);
-    }
     for (int i = 0; i < N; i++)
-        c->E[c->M + i] = cycle[i];
-
-    c->M += N;
-    c->N += 1;
-    c->V[c->N] = c->M;
+        ipamir_add_hard(solver, cycle[i] + 1);
+    ipamir_add_hard(solver, 0);
 }
 
-int dfas_explore(dfas g, cycles *c, int *sat, int d, int *e, int *v, int *marks, int *soft_marks, int max_l)
+int dfas_explore(dfas g, void *solver, int *sat, int d, int *e, int *v, int *visited, int *on_stack, int max_l, int *any)
 {
     int u = v[d];
     int res = 0;
@@ -315,24 +303,26 @@ int dfas_explore(dfas g, cycles *c, int *sat, int d, int *e, int *v, int *marks,
 
         e[d] = i;
         int w = g.E[i];
-        if (soft_marks[w]) // cycle
+        if (on_stack[w]) // cycle
         {
             int offset = 0;
             while (v[offset] != w)
                 offset++;
             int size = (d - offset) + 1;
             if (size <= max_l)
-                push_cycle(c, size, e + offset);
-
-            res++;
+            {
+                push_cycle(solver, size, e + offset);
+                res++;
+            }
+            *any = 1;
         }
-        else if (!marks[w])
+        else if (!visited[w])
         {
-            marks[w] = 1;
-            soft_marks[w] = 1;
+            visited[w] = 1;
+            on_stack[w] = 1;
             v[d + 1] = w;
-            res += dfas_explore(g, c, sat, d + 1, e, v, marks, soft_marks, max_l);
-            soft_marks[w] = 0;
+            res += dfas_explore(g, solver, sat, d + 1, e, v, visited, on_stack, max_l, any);
+            on_stack[w] = 0;
         }
     }
 
@@ -354,15 +344,15 @@ void shuffle(int *array, size_t n)
     }
 }
 
-int add_cycles(dfas g, cycles *c, int *sat, int max_l)
+int add_cycles(dfas g, void *solver, int *sat, int max_l, int *any)
 {
-    int *marks = malloc(sizeof(int) * g.N);
+    int *visited = malloc(sizeof(int) * g.N);
     for (int i = 0; i < g.N; i++)
-        marks[i] = 0;
+        visited[i] = 0;
 
-    int *soft_marks = malloc(sizeof(int) * g.N);
+    int *on_stack = malloc(sizeof(int) * g.N);
     for (int i = 0; i < g.N; i++)
-        soft_marks[i] = 0;
+        on_stack[i] = 0;
 
     int *order = malloc(sizeof(int) * g.N);
     for (int i = 0; i < g.N; i++)
@@ -376,24 +366,25 @@ int add_cycles(dfas g, cycles *c, int *sat, int max_l)
     for (int i = 0; i < g.N; i++)
     {
         int u = order[i];
-        if (marks[u])
+        if (visited[u])
             continue;
 
         v[0] = u;
-        marks[u] = 1;
-        soft_marks[u] = 1;
-        n_cycles += dfas_explore(g, c, sat, 0, e, v, marks, soft_marks, max_l);
-        soft_marks[u] = 0;
+        visited[u] = 1;
+        on_stack[u] = 1;
+        n_cycles += dfas_explore(g, solver, sat, 0, e, v, visited, on_stack, max_l, any);
+        on_stack[u] = 0;
     }
-    free(marks);
-    free(soft_marks);
+    free(visited);
+    free(on_stack);
     free(e);
     free(v);
     return n_cycles;
 }
 
-void add_cycles_init(dfas g, cycles *c)
+int add_4_cycles(dfas g, void *solver)
 {
+    int res = 0;
     int cycle[4];
     for (int u = 0; u < g.N; u++)
     {
@@ -420,19 +411,21 @@ void add_cycles_init(dfas g, cycles *c)
                         cycle[0] = i;
                         cycle[1] = j;
                         cycle[2] = k;
-                        push_cycle(c, 3, cycle);
+                        push_cycle(solver, 3, cycle);
+                        res++;
                     }
                     else if (x != u)
                     {
                         for (int l = g.V[x]; l < g.V[x + 1]; l++)
                         {
-                            if (g.a[l] && g.E[l] == u && drand48() > 0.99)
+                            if (g.a[l] && g.E[l] == u) // && drand48() > 0.99)
                             {
                                 cycle[0] = i;
                                 cycle[1] = j;
                                 cycle[2] = k;
                                 cycle[3] = l;
-                                push_cycle(c, 4, cycle);
+                                push_cycle(solver, 4, cycle);
+                                res++;
                             }
                         }
                     }
@@ -440,94 +433,83 @@ void add_cycles_init(dfas g, cycles *c)
             }
         }
     }
+    return res;
 }
 
-void dfas_solve_sat(cycles c, dfas g, int *sat)
+int add_3_cycles(dfas g, void *solver)
 {
-    int pid = getpid();
-    char name[256];
-    sprintf(name, "%d.wcnf", pid);
-    FILE *f = fopen(name, "w");
-    for (int i = 0; i < c.N; i++)
+    int res = 0;
+    int cycle[3];
+    for (int u = 0; u < g.N; u++)
     {
-        fprintf(f, "h ");
-        for (int j = c.V[i]; j < c.V[i + 1]; j++)
-            fprintf(f, "%d ", c.E[j] + 1);
-        fprintf(f, "0\n");
-    }
-    for (int i = 0; i < g.V[g.N]; i++)
-    {
-        if (!g.a[i])
-            continue;
-        fprintf(f, "%d -%d 0\n", g.W[i], i + 1);
-    }
-    fclose(f);
-    char command[256];
-    sprintf(command, "timeout 120s ./uwrmaxsat %d.wcnf > %d.sol", pid, pid);
-    int rc = system(command);
-    if (rc != 0)
-    {
-        printf("Abort\n");
-        sprintf(command, "rm -f %d.wcnf %d.sol", pid, pid);
-        rc = system(command);
-        exit(1);
-    }
-    sprintf(name, "%d.sol", pid);
-    f = fopen(name, "r");
-
-    for (int i = 0; i < g.V[g.N]; i++)
-        sat[i] = 0;
-
-    char *line = NULL;
-    size_t len = 0;
-    rc = getline(&line, &len, f);
-    while (line[0] != 'v')
-        rc = getline(&line, &len, f);
-
-    int v, offset;
-    char *data = line + 1;
-    for (int i = 0; i < g.V[g.N]; i++)
-    {
-        rc = sscanf(data, " %d%n", &v, &offset);
-        if (v > 0)
+        for (int i = g.V[u]; i < g.V[u + 1]; i++)
         {
-            sat[v - 1] = 1;
+            int v = g.E[i];
+            if (!g.a[i] || v < u)
+                continue;
+
+            for (int j = g.V[v]; j < g.V[v + 1]; j++)
+            {
+                int w = g.E[j];
+                if (!g.a[j] || w < u)
+                    continue;
+
+                for (int k = g.V[w]; k < g.V[w + 1]; k++)
+                {
+                    int x = g.E[k];
+                    if (!g.a[k] || x < u || x == v)
+                        continue;
+
+                    if (x == u)
+                    {
+                        cycle[0] = i;
+                        cycle[1] = j;
+                        cycle[2] = k;
+                        push_cycle(solver, 3, cycle);
+                        res++;
+                    }
+                }
+            }
         }
-        data += offset;
     }
-
-    free(line);
-
-    sprintf(command, "rm -f %d.wcnf %d.sol", pid, pid);
-    rc = system(command);
+    return res;
 }
 
 void dfas_solve(dfas g)
 {
-    cycles c = {.N = 0, .M = 0, .av = 16, .ae = 16};
-    c.V = malloc(sizeof(int) * c.av);
-    c.V[0] = 0;
-    c.E = malloc(sizeof(int) * c.ae);
-
     int *sat = malloc(sizeof(int) * g.V[g.N]);
     for (int i = 0; i < g.V[g.N]; i++)
         sat[i] = 0;
 
-    int max_l = 3;
-    add_cycles_init(g, &c);
-    int K = c.N; // add_cycles(g, &c, sat, max_l);
+    void *solver = ipamir_init();
+    for (int i = 0; i < g.V[g.N]; i++)
+        if (g.a[i])
+            ipamir_add_soft_lit(solver, i + 1, g.W[i]);
 
-    while (K > 0)
+    int K = add_4_cycles(g, solver);
+    int C = K;
+    int any = K > 0, max_l = 4;
+
+    while (any)
     {
-        // printf("%d %d %d\n", K, c.N, max_l);
-        dfas_solve_sat(c, g, sat);
+        // printf("%d %d %d", K, C, max_l);
+        // fflush(stdout);
+        int rc = ipamir_solve(solver);
+        // printf(" %d %ld\n", rc, ipamir_val_obj(solver));
 
-        int prev = c.N;
-        K = add_cycles(g, &c, sat, max_l);
-        while (prev == c.N && K > 0)
+        for (int i = 0; i < g.V[g.N]; i++)
+            if (g.a[i])
+                sat[i] = ipamir_val_lit(solver, i + 1) > 0;
+
+        any = 0;
+        K = add_cycles(g, solver, sat, max_l, &any);
+        C += K;
+        while (K == 0 && any)
         {
             max_l++;
-            K = add_cycles(g, &c, sat, max_l);
+            any = 0;
+            K = add_cycles(g, solver, sat, max_l, &any);
+            C += K;
         }
     }
 
@@ -536,6 +518,8 @@ void dfas_solve(dfas g)
         if (sat[i])
             g.a[i] = 0;
     }
+
+    ipamir_release(solver);
 }
 
 void dfas_solve_cc(dfas p)

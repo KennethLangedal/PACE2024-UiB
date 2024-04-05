@@ -20,101 +20,76 @@ int main(int argc, char **argv)
     graph gz = remove_degree_zero(g);
     graph gt = remove_twins(gz);
 
-    int N = 0;
-    graph *sg = split_graph(gt, &N);
+    ocm p = init_ocm_problem(gt);
+    dfas dp = dfas_construct_instance(p);
+    dfas_reduction_cc(dp);
 
-    int max = 0, max_cc = 0;
-    for (int i = 0; i < N; i++)
+    int *degree_in = malloc(sizeof(int) * dp.N);
+    int *degree_out = malloc(sizeof(int) * dp.N);
+
+    for (int u = 0; u < dp.N; u++)
     {
-        if (sg[i].B < 2)
-            continue;
-
-        ocm p = init_ocm_problem(sg[i]);
-        ocm_reduction_trivial(&p);
-        // ocm_reduction_2_1(gz, &p);
-
-        // int *s = malloc(sizeof(int) * p.N);
-        // int ub = simulated_annealing(sg[i], s);
-        // free(s);
-
-        // ocm_reduction_k_full(&p, ub);
-        // ocm_reduction_independent(&p);
-
-        dfas gp = dfas_construct_instance(p);
-        dfas_reduction_cc(gp);
-        dfas_solve_cc(gp);
-
-        // return 0;
-
-        for (int u = 0; u < gp.N; u++)
-        {
-            for (int i = gp.V[u]; i < gp.V[u + 1]; i++)
-            {
-                int v = gp.E[i];
-                if (!gp.a[i] && !p.tc[u][v] && !p.tc[v][u])
-                    ocm_add_edge(&p, v, u);
-            }
-        }
-        for (int u = 0; u < p.N; u++)
-        {
-            for (int v = u + 1; v < p.N; v++)
-            {
-                if (p.tc[u][v] || p.tc[v][u])
-                    continue;
-                if (p.cm[u][v] < p.cm[v][u])
-                    ocm_add_edge(&p, u, v);
-                else
-                    ocm_add_edge(&p, v, u);
-            }
-        }
-        // ocm_update(&p);
-
-        for (int i = 0; i < *gp.n_cc; i++)
-            if (max_cc < gp.cc_size[i])
-                max_cc = gp.cc_size[i];
-
-        if (max < p.undecided)
-            max = p.undecided;
-
-        free_ocm_problem(p);
+        degree_in[u] = 0;
+        degree_out[u] = 0;
     }
-
-    printf("%d %d\n", max, max_cc);
-
-    // dfas gp = dfas_construct_instance(p);
-    // dfas_reduction_cc(gp);
-    // f = fopen(argv[2], "w");
-    // dfas_store_dfvs(f, gp);
-    // fclose(f);
-
-    // int N = 0;
-    // for (int u = 0; u < gp.N; u++)
-    // {
-    //     for (int i = gp.V[u]; i < gp.V[u + 1]; i++)
-    //     {
-    //         if (gp.a[i])
-    //             N++;
-    //     }
-    // }
-
-    // int M = 0;
-    // for (int i = 0; i < *gp.n_cc; i++)
-    //     if (M < gp.cc_size[i])
-    //         M = gp.cc_size[i];
-
-    // printf("%d %d %d\n", gp.N, M, N);
+    for (int u = 0; u < dp.N; u++)
+    {
+        for (int i = dp.V[u]; i < dp.V[u + 1]; i++)
+        {
+            int v = dp.E[i];
+            if (!dp.a[i])
+                continue;
+            degree_in[v]++;
+            degree_out[u]++;
+        }
+    }
+    int total = 0;
+    int removeable = 0;
+    for (int u = 0; u < dp.N; u++)
+    {
+        total += degree_out[u];
+        if (degree_in[u] == 1)
+            removeable += degree_out[u];
+        else if (degree_out[u] == 1)
+            removeable += degree_in[u];
+    }
+    printf("%d %d\n", total, removeable);
 
     // printf("source;target;weight\n");
-    // for (int u = 0; u < gp.N; u++)
+    // for (int u = 0; u < dp.N; u++)
     // {
-    //     for (int i = gp.V[u]; i < gp.V[u + 1]; i++)
+    //     for (int i = dp.V[u]; i < dp.V[u + 1]; i++)
     //     {
-    //         if (!gp.a[i])
+    //         int v = dp.E[i];
+    //         if (!dp.a[i])
     //             continue;
-    //         int v = gp.E[i];
-    //         printf("%d;%d;%d\n", u, v, gp.W[i]);
+    //         printf("%d;%d;%d\n", u, v, dp.W[i]);
     //     }
     // }
+
+    // int *edges_in_cc = malloc(sizeof(int) * *dp.n_cc);
+    // for (int i = 0; i < *dp.n_cc; i++)
+    //     edges_in_cc[i] = 0;
+
+    // int max_edges = 0, total_edges = 0, max_nodes = 0;
+    // for (int i = 0; i < p.undecided; i++)
+    // {
+    //     if (dp.a[i])
+    //     {
+    //         total_edges++;
+    //         edges_in_cc[dp.cc[dp.E[i]]]++;
+    //     }
+    // }
+
+    // for (int c = 0; c < *dp.n_cc; c++)
+    // {
+    //     if (edges_in_cc[c] > max_edges)
+    //         max_edges = edges_in_cc[c];
+    //     if (dp.cc_size[c] > max_nodes)
+    //         max_nodes = dp.cc_size[c];
+    // }
+
+    // printf("%d %d %d %d %d %d\n", g.B, gz.B, gt.B, p.undecided, max_edges, max_nodes);
 
     return 0;
 }

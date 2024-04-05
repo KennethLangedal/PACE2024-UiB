@@ -7,8 +7,8 @@ ocm init_ocm_problem(graph g)
 {
     ocm p = {.crossings = 0, .lb = 0, .undecided = 0, .equal = 0, .N = g.B};
 
-    int *data = malloc(sizeof(int) * p.N * p.N);
-    p.cm = malloc(sizeof(int *) * p.N);
+    int64_t *data = malloc(sizeof(int64_t) * p.N * p.N);
+    p.cm = malloc(sizeof(int64_t *) * p.N);
 
     for (int i = 0; i < p.N; i++)
         p.cm[i] = data + i * p.N;
@@ -28,13 +28,14 @@ ocm init_ocm_problem(graph g)
         }
     }
 
-    data = malloc(sizeof(int) * p.N * p.N);
-    p.tc = malloc(sizeof(int *) * p.N);
+    int aligned_size = ((p.N + 31) / 32) * 32;
+    char *tc_data = aligned_alloc(32, sizeof(char) * aligned_size * p.N);
+    p.tc = malloc(sizeof(char *) * p.N);
     for (int i = 0; i < p.N; i++)
-        p.tc[i] = data + i * p.N;
+        p.tc[i] = tc_data + i * aligned_size;
 
-    for (int i = 0; i < p.N * p.N; i++)
-        data[i] = 0;
+    for (int i = 0; i < aligned_size * p.N; i++)
+        tc_data[i] = 0;
 
     for (int i = 0; i < p.N; i++)
         p.tc[i][i] = 1;
@@ -54,8 +55,8 @@ ocm copy_ocm_problem(ocm s)
              .equal = s.equal,
              .N = s.N};
 
-    int *data = malloc(sizeof(int) * p.N * p.N);
-    p.cm = malloc(sizeof(int *) * p.N);
+    int64_t *data = malloc(sizeof(int64_t) * p.N * p.N);
+    p.cm = malloc(sizeof(int64_t *) * p.N);
 
     for (int i = 0; i < p.N; i++)
         p.cm[i] = data + i * p.N;
@@ -63,13 +64,14 @@ ocm copy_ocm_problem(ocm s)
     for (int i = 0; i < p.N * p.N; i++)
         p.cm[0][i] = s.cm[0][i];
 
-    data = malloc(sizeof(int) * p.N * p.N);
-    p.tc = malloc(sizeof(int *) * p.N);
+    int aligned_size = ((p.N + 31) / 32) * 32;
+    char *tc_data = malloc(sizeof(char) * aligned_size * p.N);
+    p.tc = malloc(sizeof(char *) * p.N);
     for (int i = 0; i < p.N; i++)
-        p.tc[i] = data + i * p.N;
+        p.tc[i] = tc_data + i * p.N;
 
-    for (int i = 0; i < p.N * p.N; i++)
-        data[i] = s.tc[0][i];
+    for (int i = 0; i < aligned_size * p.N; i++)
+        tc_data[i] = s.tc[0][i];
 
     return p;
 }
@@ -297,6 +299,25 @@ void ocm_add_edge_fast(ocm *p, int u, int v)
         for (int j = 0; j < p->N; j++)
         {
             p->tc[i][j] |= p->tc[v][j];
+        }
+    }
+}
+
+#include <immintrin.h>
+
+void ocm_add_edge_avx(ocm *p, int u, int v)
+{
+    for (int i = 0; i < p->N; i++)
+    {
+        if (i != u && p->tc[i][u] == 0)
+            continue;
+
+        for (int j = 0; j < p->N; j += 32)
+        {
+            __m256i _i = _mm256_load_si256((const __m256i *)(p->tc[i] + j));
+            __m256i _v = _mm256_load_si256((const __m256i *)(p->tc[v] + j));
+            _i = _mm256_or_si256(_i, _v);
+            _mm256_store_si256((void *)(p->tc[i] + j), _i);
         }
     }
 }

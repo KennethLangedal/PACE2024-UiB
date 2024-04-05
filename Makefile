@@ -22,13 +22,13 @@ all : exact heuristic util
 -include $(DEP:.o=.d)
 
 exact : $(OBJ_EXACT)
-	$(CC) $(CFLAGS) -o $@ $^ -lm
+	g++ -o $@ $^ -L../uwrmaxsat/build/release/lib -luwrmaxsat -L../cominisatps/build/release/lib -lcominisatps -lm -lz -lgmp --static
 
 heuristic : $(OBJ_HEURISTIC)
 	$(CC) $(CFLAGS) -o $@ $^ -lm
 
 util : $(OBJ_UTIL)
-	$(CC) $(CFLAGS) -o $@ $^ -lm
+	g++ -o $@ $^ bin/libipamirEvalMaxSAT2022.a -lm -lz
 
 bin/%.o : %.c
 	$(CC) $(CFLAGS) -MMD -c $< -o $@
