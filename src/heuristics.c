@@ -1,8 +1,74 @@
 #include "heuristics.h"
-#include "ocm.h"
 
 #include <stdlib.h>
 #include <math.h>
+
+int dfas_simulated_annealing(dfas p, int *s)
+{
+    int **adjm = malloc(sizeof(int *) * p.N);
+    int *data = malloc(sizeof(int) * p.N * p.N);
+    for (int i = 0; i < p.N; i++)
+        adjm[i] = data + i * p.N;
+
+    for (int i = 0; i < p.N * p.N; i++)
+        data[i] = 0;
+
+    for (int u = 0; u < p.N; u++)
+        for (int i = p.V[u]; i < p.V[u + 1]; i++)
+            adjm[u][p.E[i]] = p.W[i];
+
+    for (int i = 0; i < p.N; i++)
+        s[i] = i;
+
+    int64_t cost = 0;
+    int64_t best_cost = 999999999;
+    for (int u = 0; u < p.N; u++)
+        for (int i = p.V[u]; i < p.V[u + 1]; i++)
+            if (p.E[i] < u)
+                cost += p.W[i];
+
+    double t = 0.9;
+    int it = 1000;
+
+    while (t > 0.4)
+    {
+        for (int k = 0; k < it; k++)
+        {
+            int i = rand() % p.N;
+            int j = rand() % p.N;
+            while (i == j)
+                j = rand() % p.N;
+            if (j < i)
+            {
+                int t = i;
+                i = j;
+                j = i;
+            }
+
+            int64_t diff = adjm[s[i + 1]][s[i]] - adjm[s[i]][s[i + 1]];
+            if (diff >= 0 || exp(diff / t) > drand48())
+            {
+                cost -= diff;
+                if (cost < best_cost)
+                {
+                    best_cost = cost;
+                    printf("\r%.4lf %ld    ", t, best_cost);
+                    fflush(stdout);
+                }
+                int t = s[i];
+                s[i] = s[i + 1];
+                s[i + 1] = t;
+            }
+        }
+        t *= 0.99999;
+    }
+
+    printf("\r%.4lf %ld    \n", t, best_cost);
+
+    free(adjm);
+    free(data);
+    return cost;
+}
 
 void ocm_simulated_annealing(ocm *p)
 {
