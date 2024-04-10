@@ -15,6 +15,14 @@
  * Contact: thorgalblanco@gmail.com
  */
 
+
+
+/** TODO:
+ * 1. Allow weighted edges
+ * 2. Implement way to create graph by reading some input
+ * 3. Return the order of nodes, not the sum of edges
+ */
+
 //Initialization of graph and DP-table
 //
 //
@@ -25,7 +33,6 @@ unsigned int* nodes = (unsigned int*)malloc(sizeof(unsigned int)*num_nodes);
 std::vector<std::unordered_set<unsigned int>> adj_list = {{1}, {3,4}, {1,5}, {0,1}, {3,5}, {2}};
 
 std::vector<unsigned long long> DP((unsigned long long) std::pow(2, num_nodes));
-
 
 // Helper functions
 //
