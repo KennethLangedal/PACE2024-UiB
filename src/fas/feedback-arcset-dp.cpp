@@ -19,7 +19,6 @@
 
 
 /** TODO:
- * 1. Return the order of nodes, not the sum of edges
  */
 
 //Initialization of graph and DP-table
@@ -30,6 +29,7 @@ unsigned int num_nodes;
 
 std::vector<std::unordered_map<unsigned int, unsigned int>> adj_list;
 std::vector<unsigned long long> DP;
+std::vector<std::vector<unsigned int>> DP_order;
 
 
 
@@ -42,7 +42,7 @@ std::vector<unsigned long long> DP;
  *
  */
 void read_input(unsigned int *num_nodes, std::vector<std::unordered_map<unsigned int, unsigned int>> &real_adj_list, 
-                 std::vector<unsigned long long> &real_DP){
+                 std::vector<unsigned long long> &real_DP, std::vector<std::vector<unsigned int>> &real_DP_order){
     unsigned int num_edges;
     std::vector<std::unordered_map<unsigned int, unsigned int>> adj_list;
 
@@ -54,6 +54,7 @@ void read_input(unsigned int *num_nodes, std::vector<std::unordered_map<unsigned
 
     std::vector<std::vector<std::tuple<unsigned int, unsigned int>>> placeholder_adj_list(*num_nodes);
     std::vector<unsigned long long> DP((unsigned long long) std::pow(2, *num_nodes));
+    std::vector<std::vector<unsigned int>> DP_order((unsigned long long) std::pow(2, *num_nodes));
 
     for (int i = 0; i < num_edges; i++){ 
         std::cin >> out_node;
@@ -74,6 +75,7 @@ void read_input(unsigned int *num_nodes, std::vector<std::unordered_map<unsigned
     }
     real_adj_list = adj_list;
     real_DP = DP;
+    real_DP_order = DP_order;
 
 };
 
@@ -174,11 +176,12 @@ unsigned int count_crossings(unsigned int k, unsigned long long nodes, unsigned 
  * @param *adj_list - pointer  to the adjecency mapping
  */
 
-unsigned int cum_crossings(unsigned long long curr_itt, unsigned int num_nodes, std::vector<unsigned long long> *DP,
-                            std::vector<std::unordered_map<unsigned int, unsigned int>> *adj_list){
+std::tuple<unsigned long long, unsigned int, unsigned long long> cum_crossings(unsigned long long curr_itt, unsigned int num_nodes, std::vector<unsigned long long> *DP,
+                                        std::vector<std::unordered_map<unsigned int, unsigned int>> *adj_list){
 
     int sum_initiallized = 0;
-    unsigned long long min_sum  = 0;
+    std::tuple<unsigned long long, unsigned int, unsigned long long> result = {0, 0, 0};
+    unsigned long long curr_sum;
     unsigned long long curr_perm;
 
     for (unsigned int i = 0; i < num_nodes; i++){ 
@@ -186,15 +189,25 @@ unsigned int cum_crossings(unsigned long long curr_itt, unsigned int num_nodes, 
         if ( curr_itt & (1 << i) ){
             curr_perm = curr_itt;
             curr_perm = curr_perm ^ (unsigned long long) std::pow(2, i); // We exclude curr_node from curr_perm
+            curr_sum = (*DP)[curr_perm] + count_crossings(i, curr_perm, num_nodes, adj_list);
 
             if (sum_initiallized){// This is the DP recurrsion
-                min_sum = std::min(min_sum, (*DP)[curr_perm] + count_crossings(i, curr_perm, num_nodes, adj_list));
+                if (curr_sum <= std::get<0>(result)){
+                    std::get<0>(result) = curr_sum;
+                    std::get<1>(result) = i;
+                    std::get<2>(result) = curr_perm;
+                };
             }
-            else {min_sum = (*DP)[curr_perm] + count_crossings(i, curr_perm, num_nodes, adj_list);sum_initiallized = 1;};
+            else {
+                std::get<0>(result) = curr_sum;
+                sum_initiallized = 1;
+                std::get<1>(result) = i;
+                std::get<2>(result) = curr_perm;
+            };
         };
     };
 
-    return min_sum;
+    return result;
 
 };
 
@@ -208,20 +221,30 @@ unsigned int cum_crossings(unsigned long long curr_itt, unsigned int num_nodes, 
  */
 int main(){
 
-    read_input(&num_nodes, adj_list, DP);
+    read_input(&num_nodes, adj_list, DP, DP_order);
 
     std::vector<unsigned long long> perms;
     DP[0] = 0;
 
+    std::tuple<unsigned long long, unsigned int, unsigned long long> crossings_node;
     for (unsigned int n = 1; n < num_nodes + 1; n++){ 
         perms = get_perms(n, num_nodes);
 
         for ( unsigned long long curr_itt : perms ){
-            DP[curr_itt] = cum_crossings(curr_itt, num_nodes, &DP, &adj_list);
+            crossings_node =  cum_crossings(curr_itt, num_nodes, &DP, &adj_list);
+
+            DP[curr_itt] = std::get<0>(crossings_node);
+            DP_order[curr_itt] = DP_order[std::get<2>(crossings_node)];
+            DP_order[curr_itt].push_back(std::get<1>(crossings_node));
         };
     };
 
     for (int i = 0; i < std::pow(2, num_nodes); i++){ 
         std::cout << DP[i] << "\n";
+        if (i == ((int) std::pow(2, num_nodes)) - 1){
+            for (unsigned int j : DP_order[i]){
+                std::cout << j << " ";
+            }
+        }
     };
 };
