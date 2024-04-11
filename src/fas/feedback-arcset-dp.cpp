@@ -3,6 +3,7 @@
 #include<math.h>
 #include<vector>
 #include<list>
+#include<tuple>
 #include<unordered_map>
 #include<bitset>
 
@@ -18,24 +19,63 @@
 
 
 /** TODO:
- * 1. Implement way to create graph by reading some input
- * 2. Return the order of nodes, not the sum of edges
+ * 1. Return the order of nodes, not the sum of edges
  */
 
 //Initialization of graph and DP-table
 //
 //
 
-unsigned int num_nodes = 6;
+unsigned int num_nodes;
 
-unsigned int* nodes = (unsigned int*)malloc(sizeof(unsigned int)*num_nodes);
-std::vector<std::unordered_map<unsigned int, unsigned int>> adj_list = {{{1, 3}}, {{3, 2}, {4, 4}}, {{1, 10}, {5, 4}}, {{0, 2},{1, 1}}, {{3, 5},{5, 1}}, {{2, 7}}};
+std::vector<std::unordered_map<unsigned int, unsigned int>> adj_list;
+std::vector<unsigned long long> DP;
 
-std::vector<unsigned long long> DP((unsigned long long) std::pow(2, num_nodes));
+
+
 
 // Helper functions
 //
 //
+
+/* Reads a file and creates the corresponding graph 
+ *
+ */
+void read_input(unsigned int *num_nodes, std::vector<std::unordered_map<unsigned int, unsigned int>> &real_adj_list, 
+                 std::vector<unsigned long long> &real_DP){
+    unsigned int num_edges;
+    std::vector<std::unordered_map<unsigned int, unsigned int>> adj_list;
+
+    std::cin >> *num_nodes;
+    std::cin >> num_edges;
+    unsigned int out_node;
+    unsigned int in_node;
+    unsigned int weight;
+
+    std::vector<std::vector<std::tuple<unsigned int, unsigned int>>> placeholder_adj_list(*num_nodes);
+    std::vector<unsigned long long> DP((unsigned long long) std::pow(2, *num_nodes));
+
+    for (int i = 0; i < num_edges; i++){ 
+        std::cin >> out_node;
+        std::cin >> in_node;
+        std::cin >> weight;
+
+        placeholder_adj_list[out_node].push_back({in_node, weight});
+    };
+
+    std::unordered_map<unsigned int, unsigned int> current_map;
+
+    for (std::vector<std::tuple<unsigned int, unsigned int>> node_vector : placeholder_adj_list){
+        current_map.clear();
+        for (std::tuple<unsigned int, unsigned int> node_tuple : node_vector){
+            current_map.insert(std::make_pair(std::get<0>(node_tuple), std::get<1>(node_tuple)));
+        }
+        adj_list.push_back(current_map);
+    }
+    real_adj_list = adj_list;
+    real_DP = DP;
+
+};
 
 /* calculates n choose k
  *
@@ -167,6 +207,8 @@ unsigned int cum_crossings(unsigned long long curr_itt, unsigned int num_nodes, 
  * Finds the minimum feedback vertex set size
  */
 int main(){
+
+    read_input(&num_nodes, adj_list, DP);
 
     std::vector<unsigned long long> perms;
     DP[0] = 0;
