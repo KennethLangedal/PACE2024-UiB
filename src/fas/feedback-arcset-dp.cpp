@@ -3,7 +3,7 @@
 #include<math.h>
 #include<vector>
 #include<list>
-#include<unordered_set>
+#include<unordered_map>
 #include<bitset>
 
 /** 
@@ -12,15 +12,14 @@
  * @brief calculates the minimum feedback arc set
  *
  * @author Thorgal Blanco
- * Contact: thorgalblanco@gmail.com
+ * Contact: tbl007@uib.no
  */
 
 
 
 /** TODO:
- * 1. Allow weighted edges
- * 2. Implement way to create graph by reading some input
- * 3. Return the order of nodes, not the sum of edges
+ * 1. Implement way to create graph by reading some input
+ * 2. Return the order of nodes, not the sum of edges
  */
 
 //Initialization of graph and DP-table
@@ -30,7 +29,7 @@
 unsigned int num_nodes = 6;
 
 unsigned int* nodes = (unsigned int*)malloc(sizeof(unsigned int)*num_nodes);
-std::vector<std::unordered_set<unsigned int>> adj_list = {{1}, {3,4}, {1,5}, {0,1}, {3,5}, {2}};
+std::vector<std::unordered_map<unsigned int, unsigned int>> adj_list = {{{1, 3}}, {{3, 2}, {4, 4}}, {{1, 10}, {5, 4}}, {{0, 2},{1, 1}}, {{3, 5},{5, 1}}, {{2, 7}}};
 
 std::vector<unsigned long long> DP((unsigned long long) std::pow(2, num_nodes));
 
@@ -103,7 +102,7 @@ std::vector<unsigned long long> get_perms(unsigned int n, unsigned int k){
  */
 
 unsigned int count_crossings(unsigned int k, unsigned long long nodes, unsigned int node_count,
-                             std::vector<std::unordered_set<unsigned int>> *adj_list){
+                             std::vector<std::unordered_map<unsigned int, unsigned int>> *adj_list){
 
     unsigned int count = 0;
     std::vector<unsigned int> included_nodes;
@@ -115,8 +114,8 @@ unsigned int count_crossings(unsigned int k, unsigned long long nodes, unsigned 
     };
 
     for (unsigned int node : included_nodes){
-        if ( (*adj_list)[k].count(node) > 0 ){// Checks wether any of the included nodes are in k's adj_list (adj_map)
-            count += 1;
+        if ( ((*adj_list)[k].count(node)) > 0 ){// Checks wether any of the included nodes are in k's adj_list (adj_map)
+            count += ((*adj_list)[k][node]);
         };
 
     };
@@ -135,7 +134,8 @@ unsigned int count_crossings(unsigned int k, unsigned long long nodes, unsigned 
  * @param *adj_list - pointer  to the adjecency mapping
  */
 
-unsigned int cum_crossings(unsigned long long curr_itt, unsigned int num_nodes, std::vector<unsigned long long> *DP, std::vector<std::unordered_set<unsigned int>> *adj_list){
+unsigned int cum_crossings(unsigned long long curr_itt, unsigned int num_nodes, std::vector<unsigned long long> *DP,
+                            std::vector<std::unordered_map<unsigned int, unsigned int>> *adj_list){
 
     int sum_initiallized = 0;
     unsigned long long min_sum  = 0;
