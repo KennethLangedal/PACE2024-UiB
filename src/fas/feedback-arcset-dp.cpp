@@ -19,6 +19,10 @@
 
 
 /** TODO:
+ * 1. calculate DP from 1 to 2^n, by i++, not permutaions
+ * 2. Expect input as matrix, 32 x 32, n-nodes. lookup in table pointed too.
+ * 3. Maybe unclude hsum for calculating crossings.
+ * 4. PERSONAL: look at perf doe rime checking
  */
 
 //Initialization of graph and DP-table
@@ -184,12 +188,13 @@ std::tuple<unsigned long long, unsigned int, unsigned long long> cum_crossings(u
     unsigned long long curr_sum;
     unsigned long long curr_perm;
 
-    for (unsigned int i = 0; i < num_nodes; i++){ 
+    for (unsigned int i = 0; i < std::log2(curr_itt); i++){ 
 
         if ( curr_itt & (1 << i) ){
             curr_perm = curr_itt;
             curr_perm = curr_perm ^ (unsigned long long) std::pow(2, i); // We exclude curr_node from curr_perm
             curr_sum = (*DP)[curr_perm] + count_crossings(i, curr_perm, num_nodes, adj_list);
+
 
             if (sum_initiallized){// This is the DP recurrsion
                 if (curr_sum <= std::get<0>(result)){
@@ -227,20 +232,15 @@ int main(){
     DP[0] = 0;
 
     std::tuple<unsigned long long, unsigned int, unsigned long long> crossings_node;
-    for (unsigned int n = 1; n < num_nodes + 1; n++){ 
-        perms = get_perms(n, num_nodes);
-
-        for ( unsigned long long curr_itt : perms ){
-            crossings_node =  cum_crossings(curr_itt, num_nodes, &DP, &adj_list);
-
-            DP[curr_itt] = std::get<0>(crossings_node);
-            DP_order[curr_itt] = DP_order[std::get<2>(crossings_node)];
-            DP_order[curr_itt].push_back(std::get<1>(crossings_node));
-        };
+    for (unsigned int n = 1; n < (1<<num_nodes); n++){
+        crossings_node = cum_crossings(n, num_nodes, &DP, &adj_list);
+        DP[n] = std::get<0>(crossings_node);
+        DP_order[n] = DP_order[std::get<2>(crossings_node)];
+        DP_order[n].push_back(std::get<1>(crossings_node));
     };
 
     for (int i = 0; i < std::pow(2, num_nodes); i++){ 
-        std::cout << DP[i] << "\n";
+        //std::cout << DP[i] << "\n";
         if (i == ((int) std::pow(2, num_nodes)) - 1){
             for (unsigned int j : DP_order[i]){
                 std::cout << j << " ";
