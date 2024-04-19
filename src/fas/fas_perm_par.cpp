@@ -106,13 +106,14 @@ std::vector<unsigned long long> get_perms(unsigned int n, unsigned int k){
  *
  */
 
-std::vector<std::tuple<unsigned int, unsigned int, unsigned int>> make_sub_list(k){
+std::vector<std::tuple<unsigned int, unsigned int, unsigned int>> make_sub_list(unsigned int k){
 
     std::vector<std::tuple<unsigned int, unsigned int, unsigned int>> sub_list(1<<k);
+    unsigned int count;
 
     for (int i = (1 << k) - 1; i >=0; i--){
+        count = 0;
         for (int j = 0; j < i; j++){ 
-            unsigned int count = 0;
             if (i & (1 << j)){count += 1;};
         };
         std::get<0>(sub_list[i]) = i;
@@ -123,24 +124,19 @@ std::vector<std::tuple<unsigned int, unsigned int, unsigned int>> make_sub_list(
     return sub_list;
 };
 
-std::vector<std::vector<unsigned long long>> total_update_perms_par(unsigned int n, unsigned int k, unsigned int p,
-                                                                unsigned int margin){
+void seq_update_perms(unsigned int sub_perm, unsigned int sub_n, unsigned int sub_k, unsigned int n, unsigned int k, 
+                    std::vector<unsigned long long> &local_perms){
+    unsigned int new_n = n - sub_n;
+    unsigned int new_k = k - sub_k;
 
-    std::vector<std::vector<unsigned long long>> all_perms(p);
+    std::vector<unsigned long long> rest_perms = get_perms(new_n, new_k);
 
-    unsigned int work_aim = round(log2(p * margin));
-
-    unsigned int sub_k = std::min(std::min(n, k), work_aim));
-
-    std::vector<std::tuple<unsigned int, unsigned int, unsigned int>> sub_list; //sublist[curr_perm] = [[nodes_included], [nodes_checked]]
-
-    sub_list = make_sub_list(sub_k);
-
-    par_set_perms(n, k, sub_list, all_perms);
-
-    return all_perms;
+    for (unsigned long long rest_perm : rest_perms){
+        local_perms.push_back((rest_perm << sub_k) + sub_perm);
+    }
 
 };
+
 
 void par_set_perms(unsigned int n, unsigned int k, std::vector<std::tuple<unsigned int, unsigned int, unsigned int>> &sub_list, 
                 std::vector<std::vector<unsigned long long>> &all_perms){
@@ -160,18 +156,26 @@ void par_set_perms(unsigned int n, unsigned int k, std::vector<std::tuple<unsign
     }
 };
 
-void seq_update_perms(unsigned int sub_perm, unsigned int sub_n, unsigned int sub_k, unsigned int n, unsigned int k, 
-                    std::vector<unsigned long long> &local_perms){
-    unsigned int new_n = n - sub_n;
-    unsigned int new_k = k - sub_k;
 
-    std::vector<unsigned long long> rest_perms = get_perms(new_n, new_k);
+std::vector<std::vector<unsigned long long>> total_update_perms_par(unsigned int n, unsigned int k, unsigned int p,
+                                                                unsigned int margin){
 
-    for (unsigned long long rest_perm : rest_perms){
-        local_perms.push_back((rest_perm << sub_k) + sub_perm);
-    }
+    std::vector<std::vector<unsigned long long>> all_perms(p);
+
+    unsigned int work_aim = round(log2(p * margin));
+
+    unsigned int sub_k = std::min(std::min(n, k), work_aim);
+
+    std::vector<std::tuple<unsigned int, unsigned int, unsigned int>> sub_list; //sublist[curr_perm] = [[nodes_included], [nodes_checked]]
+
+    sub_list = make_sub_list(sub_k);
+
+    par_set_perms(n, k, sub_list, all_perms);
+
+    return all_perms;
 
 };
+
 
 
 
@@ -272,7 +276,7 @@ int main(){
     start = omp_get_wtime();
     unsigned int num_nodes;
 //    std::cin >> num_nodes;
-    num_nodes = 24;
+    num_nodes = 21;
     unsigned int matrix[32][32];
     std::vector<unsigned long long> DP(1<<num_nodes);
     std::vector<std::vector<unsigned int>> DP_order(1<<num_nodes);
@@ -280,27 +284,37 @@ int main(){
     matrix_32_gen(num_nodes, &matrix);
     std::vector<std::vector<unsigned long long>> perms;
     unsigned int margin = 4;
+    unsigned int p;
     DP[0] = 0;
+
+#pragma omp parallel//Ugly, should fix at some point
+    {
+        std::cout << omp_get_max_threads() << "\n";
+        p = omp_get_num_threads();
+    }
 
     std::tuple<unsigned long long, unsigned int, unsigned long long> crossings_node;
     for (unsigned int n = 1; n < num_nodes + 1; n++){ 
         start_perms = omp_get_wtime();
-        perms = total_update_perms_par(n, num_nodes, omp_get_num_threads(), margin)
+        perms = total_update_perms_par(n, num_nodes, p, margin);
         //perms = get_perms(n, num_nodes);
         sum_perms += omp_get_wtime() - start_perms;
 
         start_DP = omp_get_wtime();
-        #pragma omp parallel
-        {
 
-            #pragma omp for
-            for ( unsigned long long curr_itt : perms ){
-                crossings_node =  cum_crossings(curr_itt, num_nodes, &DP, &matrix);
 
-                DP[curr_itt] = std::get<0>(crossings_node);
-                DP_order[curr_itt] = DP_order[std::get<2>(crossings_node)];
-                DP_order[curr_itt].push_back(std::get<1>(crossings_node));
-            };
+        for ( std::vector<unsigned long long> local_vector : perms){
+            #pragma omp parallel
+            {
+                #pragma omp for
+                for ( unsigned long long curr_itt : local_vector ){
+                    crossings_node =  cum_crossings(curr_itt, num_nodes, &DP, &matrix);
+
+                    DP[curr_itt] = std::get<0>(crossings_node);
+                    DP_order[curr_itt] = DP_order[std::get<2>(crossings_node)];
+                    DP_order[curr_itt].push_back(std::get<1>(crossings_node));
+                };
+            }
         }
         sum_DP += omp_get_wtime() - start_DP;
     };
