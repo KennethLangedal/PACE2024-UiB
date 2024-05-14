@@ -8,6 +8,8 @@
 #include<bitset>
 #include<cstdlib>
 #include<time.h>
+#include<fstream>
+#include<chrono>
 
 /** 
  * @file  feedback-arcset-dp.cpp
@@ -195,7 +197,10 @@ std::vector<unsigned int> final_ordering(std::vector<unsigned long long> *DP, un
     return ordering;
 };
 
-void write_results(unsigned int *matrix, unsigned int *num_nodes){
+void write_results(unsigned int num_nodes, double time){
+    std::ofstream outfile;
+    outfile.open("imp.txt", std::ios_base::app);
+    outfile << "number of nodes: " << num_nodes << ", time spent: " << time << std::endl;
 };
 
 
@@ -207,10 +212,12 @@ void write_results(unsigned int *matrix, unsigned int *num_nodes){
  * Finds the minimum feedback vertex set size
  */
 int main(){
+    auto start_time = std::chrono::high_resolution_clock::now();//timing
 
     unsigned int num_nodes;
+    std::cin >> num_nodes;
     unsigned int matrix[32][32];
-    matrix_32_gen(22, &matrix, &num_nodes);
+    matrix_32_gen(num_nodes, &matrix, &num_nodes);
 
     std::vector<unsigned long long> DP(1<<num_nodes);
     DP[0] = 0;
@@ -222,9 +229,15 @@ int main(){
 
 
     for (unsigned int j : final_ordering(&DP, &matrix, num_nodes)){
-        std::cout << j << " ";
+        //std::cout << j << " ";
     };
 
-    std::cout << "\n" << DP[(1<<num_nodes) - 1];
-    std::cout << "\n";
+
+    auto end_time = std::chrono::high_resolution_clock::now();//timing
+    double time_spent = ((std::chrono::duration<double, std::ratio<1>>)(end_time - start_time)).count();
+
+
+    //std::cout << "\n" << DP[(1<<num_nodes) - 1];
+    //std::cout << "\n";
+    write_results(num_nodes, time_spent);
 };
