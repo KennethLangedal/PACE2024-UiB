@@ -36,11 +36,13 @@
  * @param num_nodes         - Amount of nodes the graph has.
  * @param (*matrix)[32][32] - Pointer to the matrix of which values to update.
  */
-void matrix_32_gen(unsigned int num_nodes, unsigned int (*matrix)[32][32]){
+
+void matrix_32_gen(unsigned int num_nodes, unsigned int (*matrix)[32][32], unsigned int *num_nodes_ref){
     unsigned int rand_int;
+    *num_nodes_ref = num_nodes;
     std::srand(0);
-    for (int i = 0; i< num_nodes; i++){ 
-        for (int j = 0; j < num_nodes; j++){ 
+    for (int i = 0; i< num_nodes; i++){
+        for (int j = 0; j < num_nodes; j++){
             rand_int = 0 + std::rand() % 10;
             if (!(i == j)){
                 (*matrix)[i][j] = rand_int;
@@ -48,6 +50,29 @@ void matrix_32_gen(unsigned int num_nodes, unsigned int (*matrix)[32][32]){
         };
     };
 }
+
+void initialize_matrix(unsigned int (*matrix)[32][32]){
+    for (int i = 0; i < 32; i++){
+        for (int j = 0; j < 32; j++){
+            (*matrix)[i][j] = 0;
+        };
+    };
+}
+
+void test_matrix_1(unsigned int (*matrix)[32][32], unsigned int *num_nodes){
+    *num_nodes = 6;
+    initialize_matrix(&(*matrix));
+    (*matrix)[0][1] = 3;(*matrix)[1][3] = 2;(*matrix)[1][4] = 4;(*matrix)[2][1] = 10;(*matrix)[2][5] = 4;
+    (*matrix)[3][0] = 2;(*matrix)[3][1] = 1;(*matrix)[4][3] = 5;(*matrix)[4][5] = 1;(*matrix)[5][2] = 7;
+};
+
+void test_matrix_2(unsigned int (*matrix)[32][32], unsigned int *num_nodes){
+    *num_nodes = 10;
+    initialize_matrix(&(*matrix));
+    (*matrix)[0][1] = 5;(*matrix)[0][2] = 8;
+    (*matrix)[0][3] = 3; (*matrix)[1][3] = 8;(*matrix)[2][4] = 5;(*matrix)[3][0] = 1;(*matrix)[3][1] = 7;(*matrix)[4][3] = 26;
+    (*matrix)[4][5] = 7;(*matrix)[5][7] = 2;(*matrix)[6][4] = 8;(*matrix)[6][5] = 3;(*matrix)[7][9] = 15;(*matrix)[8][7] = 11;(*matrix)[9][8] = 23;
+};
 
 
 /* calculates n choose k
@@ -87,28 +112,25 @@ unsigned long long choose(unsigned int n, unsigned int k){
  * @param (*matrix)[32][32] - Pointer to the graph-matrix.
  */
 
-unsigned int count_crossings(unsigned int k, unsigned long long nodes, unsigned int node_count,
+
+unsigned long long count_crossings(unsigned int k, unsigned long long nodes, unsigned int node_count,
                              unsigned int (*matrix)[32][32]){
 
     unsigned int count = 0;
-    std::vector<unsigned int> included_nodes;
 
     for (unsigned int i = 0; i < node_count; i++){ 
         if (nodes & (1 << i)){
-            included_nodes.push_back(i);
+            if ( ((*matrix)[k][i]) > 0 ){// Checks wether any of the included nodes are in k's adj_list (adj_map)
+                count += ((*matrix)[k][i]);
+            };
+
         };
     };
 
-    for (unsigned int node : included_nodes){
-        //std::cout << k << " " << node << "\n";
-        if ( ((*matrix)[k][node]) > 0 ){// Checks wether any of the included nodes are in k's adj_list (adj_map)
-            count += ((*matrix)[k][node]);
-        };
-
-    };
 
     return count;
 };
+
 
 
 /*
@@ -121,13 +143,13 @@ unsigned int count_crossings(unsigned int k, unsigned long long nodes, unsigned 
  * @param (*matrix)[32][32] - pointer  to the graph-matrix
  */
 
-std::tuple<unsigned long long, unsigned int, unsigned long long> cum_crossings(unsigned long long curr_itt, unsigned int num_nodes, std::vector<unsigned long long> *DP,
+unsigned long long cum_crossings(unsigned long long curr_itt, unsigned int num_nodes, std::vector<unsigned long long> *DP,
                                         unsigned int (*matrix)[32][32]){
 
     int sum_initiallized = 0;
-    std::tuple<unsigned long long, unsigned int, unsigned long long> result = {0, 0, 0};
     unsigned long long curr_sum;
     unsigned long long curr_perm;
+    unsigned long long result;
 
     for (unsigned int i = 0; i <= std::log2(curr_itt); i++){ 
 
@@ -138,23 +160,42 @@ std::tuple<unsigned long long, unsigned int, unsigned long long> cum_crossings(u
 
 
             if (sum_initiallized){// This is the DP recurrsion
-                if (curr_sum <= std::get<0>(result)){
-                    std::get<0>(result) = curr_sum;
-                    std::get<1>(result) = i;
-                    std::get<2>(result) = curr_perm;
-                };
+                result = std::min(curr_sum, result);
             }
             else {
-                std::get<0>(result) = curr_sum;
+                result = curr_sum;
                 sum_initiallized = 1;
-                std::get<1>(result) = i;
-                std::get<2>(result) = curr_perm;
             };
         };
     };
 
     return result;
 
+};
+
+
+std::vector<unsigned int> final_ordering(std::vector<unsigned long long> *DP, unsigned int (*matrix)[32][32],
+                                    unsigned int num_nodes){
+    std::vector<unsigned int> ordering;
+    unsigned long long mask = (1<<num_nodes) - 1;
+
+    while (mask > 0){
+        for (int i = 0; i < num_nodes; i++){
+            if ((1 << i) & mask){
+
+                if ((*DP)[mask] == (*DP)[mask ^ (1 << i)] + count_crossings(i, (mask ^ (1 << i)), num_nodes, matrix)){
+                    mask -= (1 << i);
+                    ordering.push_back(i);
+                    break;
+                };
+            };
+        };
+    };
+    std::reverse(ordering.begin(), ordering.end());
+    return ordering;
+};
+
+void write_results(unsigned int *matrix, unsigned int *num_nodes){
 };
 
 
@@ -168,27 +209,22 @@ std::tuple<unsigned long long, unsigned int, unsigned long long> cum_crossings(u
 int main(){
 
     unsigned int num_nodes;
-    std::cin >> num_nodes;
     unsigned int matrix[32][32];
+    matrix_32_gen(22, &matrix, &num_nodes);
+
     std::vector<unsigned long long> DP(1<<num_nodes);
-    std::vector<std::vector<unsigned int>> DP_order(1<<num_nodes);
     DP[0] = 0;
-    matrix_32_gen(num_nodes, &matrix);
-
-
-
-
-    std::tuple<unsigned long long, unsigned int, unsigned long long> crossings_node;
 
     for (unsigned int n = 1; n < (1<<num_nodes); n++){
-        crossings_node = cum_crossings(n, num_nodes, &DP, &matrix);
-        DP[n] = std::get<0>(crossings_node);
-        DP_order[n] = DP_order[std::get<2>(crossings_node)];
-        DP_order[n].push_back(std::get<1>(crossings_node));
+        DP[n] = cum_crossings(n, num_nodes, &DP, &matrix);
     };
 
 
-    for (unsigned int j : DP_order[(1 << num_nodes) - 1]){
+
+    for (unsigned int j : final_ordering(&DP, &matrix, num_nodes)){
         std::cout << j << " ";
     };
+
+    std::cout << "\n" << DP[(1<<num_nodes) - 1];
+    std::cout << "\n";
 };
