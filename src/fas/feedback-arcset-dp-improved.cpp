@@ -10,6 +10,7 @@
 #include<time.h>
 #include<fstream>
 #include<chrono>
+#include<cstdlib>
 
 /** 
  * @file  feedback-arcset-dp.cpp
@@ -39,10 +40,10 @@
  * @param (*matrix)[32][32] - Pointer to the matrix of which values to update.
  */
 
-void matrix_32_gen(unsigned int num_nodes, unsigned int (*matrix)[32][32], unsigned int *num_nodes_ref){
+void matrix_32_gen(unsigned int num_nodes, unsigned int (*matrix)[32][32], unsigned int *num_nodes_ref, unsigned int seed){
     unsigned int rand_int;
     *num_nodes_ref = num_nodes;
-    std::srand(0);
+    std::srand(seed);
     for (int i = 0; i< num_nodes; i++){
         for (int j = 0; j < num_nodes; j++){
             rand_int = 0 + std::rand() % 10;
@@ -199,7 +200,8 @@ std::vector<unsigned int> final_ordering(std::vector<unsigned long long> *DP, un
 
 void write_results(unsigned int num_nodes, double time){
     std::ofstream outfile;
-    outfile.open("imp.txt", std::ios_base::app);
+    outfile.open("log.txt", std::ios_base::app);
+    //outfile << "ALGORITHM 2 RESULTS: " << "\n";
     outfile << "number of nodes: " << num_nodes << ", time spent: " << time << std::endl;
 };
 
@@ -211,13 +213,15 @@ void write_results(unsigned int num_nodes, double time){
 /* 
  * Finds the minimum feedback vertex set size
  */
-int main(){
+int main(int argc, char * argv[]){
     auto start_time = std::chrono::high_resolution_clock::now();//timing
 
     unsigned int num_nodes;
-    std::cin >> num_nodes;
+    unsigned int seed;
+    num_nodes = atoi(argv[1]);
+    seed = atoi(argv[2]);
     unsigned int matrix[32][32];
-    matrix_32_gen(num_nodes, &matrix, &num_nodes);
+    matrix_32_gen(num_nodes, &matrix, &num_nodes, seed);
 
     std::vector<unsigned long long> DP(1<<num_nodes);
     DP[0] = 0;
@@ -225,7 +229,6 @@ int main(){
     for (unsigned int n = 1; n < (1<<num_nodes); n++){
         DP[n] = cum_crossings(n, num_nodes, &DP, &matrix);
     };
-
 
 
     for (unsigned int j : final_ordering(&DP, &matrix, num_nodes)){

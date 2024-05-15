@@ -8,6 +8,9 @@
 #include<bitset>
 #include<cstdlib>
 #include<time.h>
+#include<fstream>
+#include<chrono>
+#include<cstdlib>
 
 /** 
  * @file  feedback-arcset-dp.cpp
@@ -36,11 +39,13 @@
  * @param num_nodes         - Amount of nodes the graph has.
  * @param (*matrix)[32][32] - Pointer to the matrix of which values to update.
  */
-void matrix_32_gen(unsigned int num_nodes, unsigned int (*matrix)[32][32]){
+
+void matrix_32_gen(unsigned int num_nodes, unsigned int (*matrix)[32][32], unsigned int *num_nodes_ref, unsigned int seed){
     unsigned int rand_int;
-    std::srand(0);
-    for (int i = 0; i< num_nodes; i++){ 
-        for (int j = 0; j < num_nodes; j++){ 
+    *num_nodes_ref = num_nodes;
+    std::srand(seed);
+    for (int i = 0; i< num_nodes; i++){
+        for (int j = 0; j < num_nodes; j++){
             rand_int = 0 + std::rand() % 10;
             if (!(i == j)){
                 (*matrix)[i][j] = rand_int;
@@ -48,6 +53,29 @@ void matrix_32_gen(unsigned int num_nodes, unsigned int (*matrix)[32][32]){
         };
     };
 }
+
+void initialize_matrix(unsigned int (*matrix)[32][32]){
+    for (int i = 0; i < 32; i++){
+        for (int j = 0; j < 32; j++){
+            (*matrix)[i][j] = 0;
+        };
+    };
+}
+
+void test_matrix_1(unsigned int (*matrix)[32][32], unsigned int *num_nodes){
+    *num_nodes = 6;
+    initialize_matrix(&(*matrix));
+    (*matrix)[0][1] = 3;(*matrix)[1][3] = 2;(*matrix)[1][4] = 4;(*matrix)[2][1] = 10;(*matrix)[2][5] = 4;
+    (*matrix)[3][0] = 2;(*matrix)[3][1] = 1;(*matrix)[4][3] = 5;(*matrix)[4][5] = 1;(*matrix)[5][2] = 7;
+};
+
+void test_matrix_2(unsigned int (*matrix)[32][32], unsigned int *num_nodes){
+    *num_nodes = 10;
+    initialize_matrix(&(*matrix));
+    (*matrix)[0][1] = 5;(*matrix)[0][2] = 8;
+    (*matrix)[0][3] = 3; (*matrix)[1][3] = 8;(*matrix)[2][4] = 5;(*matrix)[3][0] = 1;(*matrix)[3][1] = 7;(*matrix)[4][3] = 26;
+    (*matrix)[4][5] = 7;(*matrix)[5][7] = 2;(*matrix)[6][4] = 8;(*matrix)[6][5] = 3;(*matrix)[7][9] = 15;(*matrix)[8][7] = 11;(*matrix)[9][8] = 23;
+};
 
 
 /* calculates n choose k
@@ -157,6 +185,14 @@ std::tuple<unsigned long long, unsigned int, unsigned long long> cum_crossings(u
 
 };
 
+void write_results(unsigned int num_nodes, double time){
+    std::ofstream outfile;
+    outfile.open("log.txt", std::ios_base::app);
+    //outfile << "ALGORITHM 1 RESULTS: " << "\n";
+    outfile << "number of nodes: " << num_nodes << ", time spent: " << time << std::endl;
+};
+
+
 
 // main
 //
@@ -165,18 +201,18 @@ std::tuple<unsigned long long, unsigned int, unsigned long long> cum_crossings(u
 /* 
  * Finds the minimum feedback vertex set size
  */
-int main(){
+int main(int argc, char * argv[]){
+    auto start_time = std::chrono::high_resolution_clock::now();//timing
 
     unsigned int num_nodes;
-    std::cin >> num_nodes;
-    unsigned int matrix[32][32];
+    unsigned int seed;
+    num_nodes = atoi(argv[1]);
+    seed = atoi(argv[2]);    unsigned int matrix[32][32];
+    matrix_32_gen(num_nodes, &matrix, &num_nodes, seed);
+
     std::vector<unsigned long long> DP(1<<num_nodes);
     std::vector<std::vector<unsigned int>> DP_order(1<<num_nodes);
     DP[0] = 0;
-    matrix_32_gen(num_nodes, &matrix);
-
-
-
 
     std::tuple<unsigned long long, unsigned int, unsigned long long> crossings_node;
 
@@ -189,6 +225,14 @@ int main(){
 
 
     for (unsigned int j : DP_order[(1 << num_nodes) - 1]){
-        std::cout << j << " ";
+        //std::cout << j << " ";
     };
+
+
+    auto end_time = std::chrono::high_resolution_clock::now();//timing
+    double time_spent = ((std::chrono::duration<double, std::ratio<1>>)(end_time - start_time)).count();
+
+    //std::cout << "\n" << DP[(1<<num_nodes) - 1];
+    //std::cout << "\n";
+    write_results(num_nodes, time_spent);
 };
