@@ -43,7 +43,8 @@
 void matrix_32_gen(unsigned int num_nodes, unsigned int (*matrix)[32][32], unsigned int *num_nodes_ref, unsigned int seed){
     unsigned int rand_int;
     *num_nodes_ref = num_nodes;
-    std::srand(seed);
+    if(seed == 0){std::srand(time(NULL));}
+    else {std::srand(seed);};
     for (int i = 0; i< num_nodes; i++){
         for (int j = 0; j < num_nodes; j++){
             rand_int = 0 + std::rand() % 10;
