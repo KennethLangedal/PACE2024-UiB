@@ -1,470 +1,142 @@
 #include "ocm.h"
 
 #include <stdlib.h>
-#include <assert.h>
 
-ocm init_ocm_problem(graph g)
+static inline void skip_comments(FILE *f)
 {
-    ocm p = {.crossings = 0, .lb = 0, .undecided = 0, .equal = 0, .N = g.B};
-
-    int64_t *data = malloc(sizeof(int64_t) * p.N * p.N);
-    p.cm = malloc(sizeof(int64_t *) * p.N);
-
-    for (int i = 0; i < p.N; i++)
-        p.cm[i] = data + i * p.N;
-
-    for (int u = 0; u < p.N; u++)
-        for (int v = 0; v < p.N; v++)
-            p.cm[u][v] = count_crossings_pair(g, u + g.A, v + g.A);
-
-    for (int u = 0; u < p.N; u++)
+    int c = fgetc_unlocked(f);
+    while (c == 'c')
     {
-        for (int v = u + 1; v < p.N; v++)
-        {
-            if (p.cm[u][v] == p.cm[v][u])
-                p.equal++;
-            else
-                p.undecided++;
-        }
+        while (c != '\n')
+            c = fgetc_unlocked(f);
+        c = fgetc_unlocked(f);
     }
-
-    int aligned_size = ((p.N + 31) / 32) * 32;
-    char *tc_data = aligned_alloc(32, sizeof(char) * aligned_size * p.N);
-    p.tc = malloc(sizeof(char *) * p.N);
-    for (int i = 0; i < p.N; i++)
-        p.tc[i] = tc_data + i * aligned_size;
-
-    for (int i = 0; i < aligned_size * p.N; i++)
-        tc_data[i] = 0;
-
-    for (int i = 0; i < p.N; i++)
-        p.tc[i][i] = 1;
-
-    for (int i = 0; i < p.N; i++)
-        for (int j = i + 1; j < p.N; j++)
-            p.lb += p.cm[i][j] < p.cm[j][i] ? p.cm[i][j] : p.cm[j][i];
-
-    return p;
+    ungetc(c, f);
 }
 
-ocm copy_ocm_problem(ocm s)
+static inline void skip_line(FILE *f)
 {
-    ocm p = {.crossings = s.crossings,
-             .lb = s.lb,
-             .undecided = s.undecided,
-             .equal = s.equal,
-             .N = s.N};
-
-    int64_t *data = malloc(sizeof(int64_t) * p.N * p.N);
-    p.cm = malloc(sizeof(int64_t *) * p.N);
-
-    for (int i = 0; i < p.N; i++)
-        p.cm[i] = data + i * p.N;
-
-    for (int i = 0; i < p.N * p.N; i++)
-        p.cm[0][i] = s.cm[0][i];
-
-    int aligned_size = ((p.N + 31) / 32) * 32;
-    char *tc_data = malloc(sizeof(char) * aligned_size * p.N);
-    p.tc = malloc(sizeof(char *) * p.N);
-    for (int i = 0; i < p.N; i++)
-        p.tc[i] = tc_data + i * p.N;
-
-    for (int i = 0; i < aligned_size * p.N; i++)
-        tc_data[i] = s.tc[0][i];
-
-    return p;
+    int c = fgetc_unlocked(f);
+    while (c != '\n')
+        c = fgetc_unlocked(f);
 }
 
-void free_ocm_problem(ocm p)
+static inline void parse_unsigned_int(FILE *f, int *v)
 {
-    free(*p.cm);
-    free(p.cm);
-    free(*p.tc);
-    free(p.tc);
-}
+    int c = fgetc_unlocked(f);
+    while ((c < '0' || c > '9') && c != '\n')
+        c = fgetc_unlocked(f);
 
-void ocm_reduction_trivial(ocm *p)
-{
-    for (int i = 0; i < p->N; i++)
+    *v = -1;
+    if (c == '\n')
     {
-        for (int j = i + 1; j < p->N; j++)
-        {
-            if (p->cm[i][j] == 0)
-            {
-                p->tc[i][j] = 1;
-                if (p->cm[j][i] == 0)
-                    p->equal--;
-                else
-                    p->undecided--;
-            }
-            else if (p->cm[j][i] == 0)
-            {
-                p->tc[j][i] = 1;
-                p->undecided--;
-            }
-        }
-    }
-}
-
-void ocm_reduction_2_1(graph g, ocm *p)
-{
-    for (int i = 0; i < p->N; i++)
-    {
-        for (int j = 0; j < p->N; j++)
-        {
-            if (p->cm[i][j] == 1 && p->cm[j][i] == 2 &&
-                g.V[g.A + i + 1] - g.V[g.A + i] == 2 &&
-                g.V[g.A + j + 1] - g.V[g.A + j] == 2 &&
-                (g.E[g.V[g.A + i]] == g.E[g.V[g.A + j]] || g.E[g.V[g.A + i] + 1] == g.E[g.V[g.A + j] + 1]))
-            {
-                ocm_add_edge(p, i, j);
-            }
-        }
-    }
-}
-
-void ocm_reduction_twins(graph g, ocm *p)
-{
-    for (int u = g.A; u < g.N; u++)
-    {
-        if (g.V[u + 1] - g.V[u] < 1)
-            continue;
-
-        int w = g.E[g.V[u]];
-        for (int i = g.V[w]; i < g.V[w + 1]; i++)
-        {
-            int v = g.E[i];
-            if (v <= u)
-                continue;
-
-            if (!p->tc[u - g.A][v - g.A] && !p->tc[v - g.A][u - g.A] && test_twin(g, u, v))
-                ocm_add_edge(p, u - g.A, v - g.A);
-        }
-    }
-}
-
-void ocm_reduction_independent(ocm *p)
-{
-    if (p->N < 2)
+        ungetc(c, f);
         return;
-
-    int found = 1;
-    while (found)
-    {
-        found = 0;
-
-        for (int i = 0; i < p->N; i++)
-        {
-            int v = -1;
-            int c = 0;
-            for (int j = 0; j < p->N; j++)
-            {
-                if (i == j || p->tc[i][j] || p->tc[j][i] || p->cm[i][j] == p->cm[j][i])
-                    continue;
-
-                v = j;
-                c++;
-            }
-
-            if (c == 1)
-            {
-                if (p->cm[i][v] <= p->cm[v][i])
-                    ocm_add_edge(p, i, v);
-                else
-                    ocm_add_edge(p, v, i);
-
-                found = 1;
-            }
-        }
-    }
-}
-
-void ocm_reduction_k_quick(ocm *p, int ub)
-{
-    int found = 1;
-    while (found)
-    {
-        found = 0;
-        for (int i = 0; i < p->N; i++)
-        {
-            for (int j = i + 1; j < p->N; j++)
-            {
-                if (p->tc[i][j] || p->tc[j][i])
-                    continue;
-
-                int u = i, v = j;
-                if (p->cm[i][j] > p->cm[j][i])
-                    u = j, v = i;
-
-                if (p->crossings + p->lb + (p->cm[v][u] - p->cm[u][v]) >= ub)
-                {
-                    ocm_add_edge(p, u, v);
-                    found = 1;
-                }
-            }
-        }
-    }
-}
-
-void ocm_reduction_k_full(ocm *p, int ub)
-{
-    int found = 1;
-    while (found)
-    {
-        found = 0;
-        for (int i = 0; i < p->N; i++)
-        {
-            for (int j = i + 1; j < p->N; j++)
-            {
-                if (p->tc[i][j] || p->tc[j][i])
-                    continue;
-
-                int u = i, v = j;
-                if (p->cm[i][j] > p->cm[j][i])
-                    u = j, v = i;
-
-                int extra = ocm_try_edge(*p, v, u);
-
-                if (p->crossings + p->lb + extra >= ub)
-                {
-                    ocm_add_edge(p, u, v);
-                    found = 1;
-                    continue;
-                }
-
-                extra = ocm_try_edge(*p, u, v);
-
-                if (p->crossings + p->lb + extra >= ub)
-                {
-                    ocm_add_edge(p, v, u);
-                    found = 1;
-                }
-            }
-        }
-    }
-}
-
-int ocm_try_edge(ocm p, int u, int v)
-{
-    int extra = 0;
-    for (int i = 0; i < p.N; i++)
-    {
-        if (i != u && p.tc[i][u] == 0)
-            continue;
-
-        for (int j = 0; j < p.N; j++)
-        {
-            if (j == i || (j != v && p.tc[v][j] == 0) || p.tc[i][j] == 1)
-                continue;
-
-            extra += p.cm[i][j] > p.cm[j][i] ? p.cm[i][j] - p.cm[j][i] : 0;
-        }
     }
 
-    return extra;
+    *v = 0;
+    while (c >= '0' && c <= '9')
+    {
+        *v = (*v * 10) + (c - '0');
+        c = fgetc_unlocked(f);
+    }
+    ungetc(c, f);
 }
 
-void ocm_add_edge(ocm *p, int u, int v)
+static inline int compare(const void *a, const void *b)
 {
-    for (int i = 0; i < p->N; i++)
+    return (*(int *)a - *(int *)b);
+}
+
+ocm ocm_parse(FILE *f)
+{
+    skip_comments(f);
+    ocm p;
+    parse_unsigned_int(f, &p.n0);
+    parse_unsigned_int(f, &p.n1);
+    parse_unsigned_int(f, &p.m);
+    parse_unsigned_int(f, &p.cw);
+
+    if (p.cw >= 0)
     {
-        if (i != u && p->tc[i][u] == 0)
-            continue;
-
-        for (int j = 0; j < p->N; j++)
+        p.C = malloc(sizeof(int) * (p.n0 + p.n1));
+        for (int i = 0; i < p.n0 + p.n1; i++)
         {
-            if (j == i || (j != v && p->tc[v][j] == 0) || p->tc[i][j] == 1)
-                continue;
-
-            p->lb -= p->cm[i][j] > p->cm[j][i] ? p->cm[j][i] : p->cm[i][j];
-            p->crossings += p->cm[i][j];
-            p->tc[i][j] = 1;
-
-            if (p->cm[i][j] == p->cm[j][i])
-                p->equal++;
-            else
-                p->undecided--;
+            skip_line(f);
+            skip_comments(f);
+            parse_unsigned_int(f, p.C + i);
+            p.C[i]--;
         }
     }
-}
-
-void ocm_add_edge_fast(ocm *p, int u, int v)
-{
-    for (int i = 0; i < p->N; i++)
+    else
     {
-        if (i != u && p->tc[i][u] == 0)
-            continue;
-
-        for (int j = 0; j < p->N; j++)
-        {
-            p->tc[i][j] |= p->tc[v][j];
-        }
-    }
-}
-
-#include <immintrin.h>
-
-void ocm_add_edge_avx(ocm *p, int u, int v)
-{
-    for (int i = 0; i < p->N; i++)
-    {
-        if (i != u && p->tc[i][u] == 0)
-            continue;
-
-        for (int j = 0; j < p->N; j += 32)
-        {
-            __m256i _i = _mm256_load_si256((const __m256i *)(p->tc[i] + j));
-            __m256i _v = _mm256_load_si256((const __m256i *)(p->tc[v] + j));
-            _i = _mm256_or_si256(_i, _v);
-            _mm256_store_si256((void *)(p->tc[i] + j), _i);
-        }
-    }
-}
-
-void ocm_update(ocm *p)
-{
-    p->equal = 0;
-    p->undecided = 0;
-    p->lb = 0;
-    p->crossings = 0;
-    for (int i = 0; i < p->N; i++)
-    {
-        for (int j = i + 1; j < p->N; j++)
-        {
-            if (p->tc[i][j] || p->tc[j][i])
-            {
-                if (p->tc[i][j])
-                    p->crossings += p->cm[i][j];
-                else
-                    p->crossings += p->cm[j][i];
-            }
-            else if (p->cm[i][j] == p->cm[j][i])
-            {
-                p->equal++;
-                p->lb += p->cm[i][j];
-            }
-            else
-            {
-                p->undecided++;
-                p->lb += p->cm[i][j] < p->cm[j][i] ? p->cm[i][j] : p->cm[j][i];
-            }
-        }
-    }
-}
-
-int64_t count_crossings_pair(graph g, int u, int v)
-{
-    if (u == v)
-        return 0;
-
-    int64_t crossings = 0;
-
-    int i = g.V[u];
-    int j = g.V[v];
-
-    while (i < g.V[u + 1] && j < g.V[v + 1])
-    {
-        if (g.E[j] < g.E[i])
-        {
-            crossings += g.V[u + 1] - i;
-            j++;
-        }
-        else
-            i++;
+        p.C = NULL;
     }
 
-    return crossings * g.twins[u] * g.twins[v];
-}
+    int *X = malloc(sizeof(int) * p.m);
+    int *Y = malloc(sizeof(int) * p.m);
 
-int64_t count_crossings_solution(graph g, int *s)
-{
-    int64_t crossings = 0;
+    int *D = malloc(sizeof(int) * p.n1);
+    for (int i = 0; i < p.n1; i++)
+        D[i] = 0;
 
-    for (int i = 0; i < g.B; i++)
-        for (int j = i + 1; j < g.B; j++)
-            crossings += count_crossings_pair(g, s[i], s[j]);
-
-    return crossings;
-}
-
-void lift_solution_degree_zero(graph g, graph r, int **s)
-{
-    int *sl = malloc(sizeof(int) * g.B);
-
-    int p = 0;
-    for (int i = 0; i < r.B; i++)
-        sl[p++] = r.old_label[(*s)[i]];
-
-    for (int u = g.A; u < g.N; u++)
-        if (g.V[u + 1] - g.V[u] < 1)
-            sl[p++] = u;
-
-    free(*s);
-    *s = sl;
-}
-
-void lift_solution_twins(graph g, graph r, int **s)
-{
-    int *sl = malloc(sizeof(int) * g.B);
-
-    int p = 0;
-    for (int i = 0; i < r.B; i++)
+    for (int i = 0; i < p.m; i++)
     {
-        int u = (*s)[i];
-        int _u = r.old_label[u];
-        sl[p++] = _u;
-        if (r.twins[u] > 1)
-        {
-            int _w = g.E[g.V[_u]];
-            for (int j = g.V[_w]; j < g.V[_w + 1]; j++)
-            {
-                int _v = g.E[j];
-                if (_u != _v && test_twin(g, _u, _v))
-                    sl[p++] = _v;
-            }
-        }
+        skip_line(f);
+        skip_comments(f);
+        parse_unsigned_int(f, X + i);
+        parse_unsigned_int(f, Y + i);
+        X[i]--;
+        Y[i]--;
+        D[Y[i] - p.n0]++;
     }
 
-    free(*s);
-    *s = sl;
-}
+    p.V = malloc(sizeof(int) * (p.n1 + 1));
+    p.E = malloc(sizeof(int) * p.m);
 
-int count_relevant_vertices(ocm p)
-{
-    int decided = 0;
-    for (int i = 0; i < p.N; i++)
+    p.V[0] = 0;
+    for (int i = 0; i < p.n1; i++)
+        p.V[i + 1] = p.V[i] + D[i];
+
+    for (int i = 0; i < p.n1; i++)
+        D[i] = 0;
+
+    for (int i = 0; i < p.m; i++)
     {
-        int found = 0;
-        for (int j = 0; j < p.N; j++)
-        {
-            if (i != j && !p.tc[i][j] && !p.tc[j][i] && p.cm[i][j] != p.cm[j][i])
-            {
-                found = 1;
-                break;
-            }
-        }
-        if (!found)
-            decided++;
+        int u = X[i], v = Y[i] - p.n0;
+        p.E[p.V[v] + D[v]] = u;
+        D[v]++;
     }
-    return p.N - decided;
+
+    for (int i = 0; i < p.n1; i++)
+        qsort(p.E + p.V[i], p.V[i + 1] - p.V[i], sizeof(int), compare);
+
+    free(X);
+    free(Y);
+    free(D);
+
+    return p;
 }
 
-void ocm_copy_tc(ocm s, ocm *d)
+void ocm_free(ocm p)
 {
-    for (int i = 0; i < s.N * s.N; i++)
-        (*d->tc)[i] = (*s.tc)[i];
-
-    d->crossings = s.crossings;
-    d->lb = s.lb;
-    d->undecided = s.undecided;
-    d->equal = s.equal;
+    free(p.V);
+    free(p.E);
+    free(p.C);
 }
 
-void ocm_copy_full(ocm s, ocm *d)
+int ocm_validate(ocm p)
 {
-    ocm_copy_tc(s, d);
-    d->N = s.N;
-    for (int i = 0; i < s.N * s.N; i++)
-        (*d->cm)[i] = (*s.cm)[i];
+    for (int u = 0; u < p.n1; u++)
+    {
+        for (int i = p.V[u]; i < p.V[u + 1]; i++)
+        {
+            int v = p.E[i];
+            if (i > p.V[u] && v <= p.E[i - 1])
+                return 0;
+            if (v < 0 || v >= p.n0)
+                return 0;
+        }
+    }
+    return 1;
 }

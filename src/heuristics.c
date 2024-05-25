@@ -1,163 +1,235 @@
 #include "heuristics.h"
+#include "tiny_solver.h"
 
 #include <stdlib.h>
-#include <math.h>
 
-int dfas_simulated_annealing(dfas p, int *s)
+void shuffle(int *array, int n)
 {
-    int **adjm = malloc(sizeof(int *) * p.N);
-    int *data = malloc(sizeof(int) * p.N * p.N);
-    for (int i = 0; i < p.N; i++)
-        adjm[i] = data + i * p.N;
-
-    for (int i = 0; i < p.N * p.N; i++)
-        data[i] = 0;
-
-    for (int u = 0; u < p.N; u++)
-        for (int i = p.V[u]; i < p.V[u + 1]; i++)
-            adjm[u][p.E[i]] = p.W[i];
-
-    for (int i = 0; i < p.N; i++)
-        s[i] = i;
-
-    int64_t cost = 0;
-    int64_t best_cost = 999999999;
-    for (int u = 0; u < p.N; u++)
-        for (int i = p.V[u]; i < p.V[u + 1]; i++)
-            if (p.E[i] < u)
-                cost += p.W[i];
-
-    double t = 0.9;
-    int it = 1000;
-
-    while (t > 0.4)
+    for (int i = 0; i < n - 1; i++)
     {
-        for (int k = 0; k < it; k++)
-        {
-            int i = rand() % p.N;
-            int j = rand() % p.N;
-            while (i == j)
-                j = rand() % p.N;
-            if (j < i)
-            {
-                int t = i;
-                i = j;
-                j = i;
-            }
+        int j = i + rand() / (RAND_MAX / (n - i) + 1);
+        int t = array[j];
+        array[j] = array[i];
+        array[i] = t;
+    }
+}
 
-            int64_t diff = adjm[s[i + 1]][s[i]] - adjm[s[i]][s[i + 1]];
-            if (diff >= 0 || exp(diff / t) > drand48())
+int try_right(int **W, int *O, int *c, int i, int n, int *lr, int *ll)
+{
+    int u = O[i];
+    int change = 0;
+    int last_pos = i;
+    int max_gain = lr[u];
+    for (int j = i + 1; j < n && change - max_gain <= 0; j++)
+    {
+        int v = O[j];
+        change += W[u][v];
+        change -= W[v][u];
+        max_gain -= W[v][u];
+        if (change < 0)
+        {
+            last_pos = j;
+            break;
+        }
+        if (change == 0)
+            last_pos = j;
+    }
+    if (last_pos != i)
+    {
+        if (change < 0)
+            *c += change;
+        for (int k = i; k < last_pos; k++)
+        {
+            O[k] = O[k + 1];
+            lr[O[k]] += W[u][O[k]];
+            ll[O[k]] -= W[O[k]][u];
+
+            lr[u] -= W[O[k]][u];
+            ll[u] += W[u][O[k]];
+        }
+        O[last_pos] = u;
+    }
+    return change < 0;
+}
+
+int try_left(int **W, int *O, int *c, int i, int n, int *lr, int *ll)
+{
+    int u = O[i];
+    int change = 0;
+    int last_pos = i;
+    int max_gain = ll[u];
+    for (int j = i - 1; j >= 0 && change - max_gain <= 0; j--)
+    {
+        int v = O[j];
+        change -= W[u][v];
+        change += W[v][u];
+        max_gain -= W[u][v];
+        if (change < 0)
+        {
+            last_pos = j;
+            break;
+        }
+        if (change == 0)
+            last_pos = j;
+    }
+    if (last_pos != i)
+    {
+        if (change < 0)
+            *c += change;
+        for (int k = i; k > last_pos; k--)
+        {
+            O[k] = O[k - 1];
+            lr[O[k]] -= W[u][O[k]];
+            ll[O[k]] += W[O[k]][u];
+
+            lr[u] += W[O[k]][u];
+            ll[u] -= W[u][O[k]];
+        }
+        O[last_pos] = u;
+    }
+    return change < 0;
+}
+
+void heuristics_greedy_improvement(comp c)
+{
+    int *lr = malloc(sizeof(int) * c.n);
+    int *ll = malloc(sizeof(int) * c.n);
+    int *V = malloc(sizeof(int) * c.n);
+    for (int i = 0; i < c.n; i++)
+        V[i] = i;
+    shuffle(V, c.n);
+
+    for (int i = 0; i < c.n; i++)
+    {
+        int u = c.S[i];
+        lr[u] = 0;
+        ll[u] = 0;
+        for (int j = i + 1; j < c.n; j++)
+        {
+            int v = c.S[j];
+            lr[u] += c.W[v][u];
+        }
+        for (int j = 0; j < i; j++)
+        {
+            int v = c.S[j];
+            ll[u] += c.W[u][v];
+        }
+    }
+
+    int found = 1;
+    while (found)
+    {
+        found = 0;
+        for (int _i = 0; _i < c.n; _i++)
+        {
+            int i = V[_i];
+            if (_i & 1)
             {
-                cost -= diff;
-                if (cost < best_cost)
+                int imp = try_right(c.W, c.S, c.c, i, c.n, lr, ll);
+                if (!imp)
+                    imp = try_left(c.W, c.S, c.c, i, c.n, lr, ll);
+                found |= imp;
+            }
+            else
+            {
+                int imp = try_left(c.W, c.S, c.c, i, c.n, lr, ll);
+                if (!imp)
+                    imp = try_right(c.W, c.S, c.c, i, c.n, lr, ll);
+                found |= imp;
+            }
+        }
+    }
+
+    free(lr);
+    free(ll);
+    free(V);
+}
+
+void heuristics_cut_matrix(int **cut_matrix, comp c)
+{
+    for (int i = 0; i < c.n; i++)
+        cut_matrix[i][i] = 0;
+
+    for (int i = 0; i < c.n; i++)
+        for (int j = i + 1; j < c.n; j++)
+            cut_matrix[i][j] = (c.W[c.S[i]][c.S[j]] - c.W[c.S[j]][c.S[i]]) + cut_matrix[i][j - 1];
+
+    for (int j = 0; j < c.n; j++)
+        for (int i = j - 1; i >= 0; i--)
+            cut_matrix[i][j] += cut_matrix[i + 1][j];
+}
+
+void heuristics_swap_cut(comp c, int l, int k, int r, int *tmp, int change)
+{
+    *c.c += change;
+    for (int i = 0; i < (k + 1) - l; i++)
+        tmp[i] = c.S[l + i];
+
+    for (int i = 0; i < r - k; i++)
+        c.S[l + i] = c.S[(k + 1) + i];
+
+    for (int i = 0; i < (k + 1) - l; i++)
+        c.S[l + (r - k) + i] = tmp[i];
+}
+
+void heuristics_greedy_cut(comp c)
+{
+    int *tmp = malloc(sizeof(int) * c.n);
+
+    int *cut_data = malloc(sizeof(int) * c.n * c.n);
+    for (int i = 0; i < c.n * c.n; i++)
+        cut_data[i] = 0;
+
+    int **cut_matrix = malloc(sizeof(int *) * c.n);
+    for (int i = 0; i < c.n; i++)
+        cut_matrix[i] = cut_data + i * c.n;
+
+    heuristics_cut_matrix(cut_matrix, c);
+
+    for (int i = 0; i < c.n; i++)
+    {
+        for (int j = i + 1; j < c.n; j++)
+        {
+            for (int k = i; k < j && k < i + 5; k++)
+            {
+                int d = cut_matrix[i][j] - cut_matrix[i][k] - cut_matrix[k + 1][j];
+                if (d < 0)
                 {
-                    best_cost = cost;
-                    printf("\r%.4lf %ld    ", t, best_cost);
-                    fflush(stdout);
+                    heuristics_swap_cut(c, i, k, j, tmp, d);
+                    heuristics_cut_matrix(cut_matrix, c);
                 }
-                int t = s[i];
-                s[i] = s[i + 1];
-                s[i + 1] = t;
+            }
+            for (int k = j - 5; k < j && k >= i + 5; k++)
+            {
+                int d = cut_matrix[i][j] - cut_matrix[i][k] - cut_matrix[k + 1][j];
+                if (d < 0)
+                {
+                    heuristics_swap_cut(c, i, k, j, tmp, d);
+                    heuristics_cut_matrix(cut_matrix, c);
+                }
             }
         }
-        t *= 0.99999;
     }
 
-    printf("\r%.4lf %ld    \n", t, best_cost);
-
-    free(adjm);
-    free(data);
-    return cost;
+    free(tmp);
+    free(cut_data);
+    free(cut_matrix);
 }
 
-void ocm_simulated_annealing(ocm *p)
+void heuristic_randomize_solution(comp c, int changes)
 {
-    int *s = malloc(sizeof(int) * p->N);
-    for (int i = 0; i < p->N; i++)
-        s[i] = i;
-
-    if (p->N < 2)
-        return;
-
-    int64_t cost = 0;
-    for (int i = 0; i < p->N; i++)
-        for (int j = i + 1; j < p->N; j++)
-            cost += p->cm[s[i]][s[j]];
-
-    double t = 0.9;
-    int it = 100;
-
-    while (t > 0.001)
+    for (int i = 0; i < changes; i++)
     {
-        for (int k = 0; k < it; k++)
-        {
-            int i = rand() % (p->N - 1);
-            int64_t current_cost = p->cm[s[i]][s[i + 1]];
-            int64_t alt_cost = p->cm[s[i + 1]][s[i]];
-            double diff = current_cost - alt_cost;
-            if (diff >= 0 || exp(diff / t) > drand48())
-            {
-                cost -= current_cost;
-                cost += alt_cost;
-                int t = s[i];
-                s[i] = s[i + 1];
-                s[i + 1] = t;
-            }
-        }
-        t *= 0.9999;
+        int s = rand() % c.n;
+        int t = rand() % c.n;
+
+        int u = c.S[s];
+        c.S[s] = c.S[t];
+        c.S[t] = u;
     }
 
-    for (int i = 0; i < p->N; i++)
-        for (int j = 0; j < p->N; j++)
-            p->tc[i][j] = 0;
-
-    for (int i = 0; i < p->N; i++)
-        for (int j = i + 1; j < p->N; j++)
-            p->tc[s[i]][s[j]] = 1;
-
-    free(s);
-
-    p->equal = 0;
-    p->undecided = 0;
-    p->crossings = cost;
-    p->lb = 0;
-}
-
-int simulated_annealing(graph g, int *s)
-{
-    for (int i = g.A; i < g.N; i++)
-        s[i - g.A] = i;
-
-    if (g.B < 2)
-        return 0;
-
-    int64_t cost = 0;
-    for (int i = 0; i < g.B; i++)
-        for (int j = i + 1; j < g.B; j++)
-            cost += count_crossings_pair(g, s[i], s[j]);
-
-    double t = 0.9;
-    int it = 100;
-
-    while (t > 0.001)
-    {
-        for (int k = 0; k < it; k++)
-        {
-            int i = rand() % (g.B - 1);
-            int64_t current_cost = count_crossings_pair(g, s[i], s[i + 1]);
-            int64_t alt_cost = count_crossings_pair(g, s[i + 1], s[i]);
-            double diff = current_cost - alt_cost;
-            if (diff >= 0 || exp(diff / t) > drand48())
-            {
-                cost -= current_cost;
-                cost += alt_cost;
-                int t = s[i];
-                s[i] = s[i + 1];
-                s[i + 1] = t;
-            }
-        }
-        t *= 0.99;
-    }
-
-    return cost;
+    *c.c = 0;
+    for (int i = 0; i < c.n; i++)
+        for (int j = i + 1; j < c.n; j++)
+            *c.c += c.W[c.S[j]][c.S[i]];
 }

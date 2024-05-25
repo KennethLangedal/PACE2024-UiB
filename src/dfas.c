@@ -1,167 +1,137 @@
 #include "dfas.h"
-#include "ipamir.h"
-#include "heuristics.h"
 
-#include <string.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <sys/types.h>
 
-static inline int compare(const void *a, const void *b)
+static inline void count_crossings(int *V, int *E, int u, int v, int *uv, int *vu)
 {
-    return (*(int *)a - *(int *)b);
+    *uv = 0;
+    *vu = 0;
+    int i = V[u], j = V[v];
+    while (i < V[u + 1] && j < V[v + 1])
+    {
+        if (E[i] < E[j])
+        {
+            *vu += V[v + 1] - j;
+            i++;
+        }
+        else if (E[i] > E[j])
+        {
+            *uv += V[u + 1] - i;
+            j++;
+        }
+        else
+        {
+            i++;
+            j++;
+            *uv += V[u + 1] - i;
+            *vu += V[v + 1] - j;
+        }
+    }
 }
 
-dfas dfas_construct_instance(ocm p)
+static inline int compare_ranges(const void *a, const void *b, void *arg)
 {
-    dfas g = {.N = p.N};
-    g.V = malloc(sizeof(int) * (p.N + 1));
-    g.E = malloc(sizeof(int) * p.undecided);
-    g.W = malloc(sizeof(int) * p.undecided);
+    int u = *(int *)a, v = *(int *)b;
+    ocm *p = (ocm *)arg;
 
-    g.id_V = malloc(sizeof(int) * p.N);
-    g.id_E = malloc(sizeof(int) * p.undecided);
+    if (p->V[u + 1] - p->V[u] == 0)
+        return -(p->V[v + 1] - p->V[v]);
+    if (p->V[v + 1] - p->V[v] == 0)
+        return p->V[u + 1] - p->V[u];
 
-    for (int i = 0; i <= p.N; i++)
-        g.V[i] = 0;
-
-    for (int i = 0; i < p.N; i++)
-        g.id_V[i] = i;
-
-    for (int i = 0; i < p.undecided; i++)
-        g.id_E[i] = i;
-
-    for (int i = 0; i < p.N; i++)
-    {
-        for (int j = i + 1; j < p.N; j++)
-        {
-            if (p.tc[i][j] || p.tc[j][i] || p.cm[i][j] == p.cm[j][i])
-                continue;
-
-            if (p.cm[i][j] < p.cm[j][i])
-                g.V[i]++;
-            else
-                g.V[j]++;
-        }
-    }
-
-    for (int i = 1; i <= p.N; i++)
-        g.V[i] += g.V[i - 1];
-
-    for (int i = 0; i < p.N; i++)
-    {
-        for (int j = i + 1; j < p.N; j++)
-        {
-            if (p.tc[i][j] || p.tc[j][i] || p.cm[i][j] == p.cm[j][i])
-                continue;
-
-            if (p.cm[i][j] < p.cm[j][i])
-            {
-                g.V[i]--;
-                g.E[g.V[i]] = j;
-            }
-            else
-            {
-                g.V[j]--;
-                g.E[g.V[j]] = i;
-            }
-        }
-    }
-
-    for (int i = 0; i < g.N; i++)
-        qsort(g.E + g.V[i], g.V[i + 1] - g.V[i], sizeof(int), compare);
-
-    for (int u = 0; u < g.N; u++)
-    {
-        for (int i = g.V[u]; i < g.V[u + 1]; i++)
-        {
-            int v = g.E[i];
-            g.W[i] = p.cm[v][u] - p.cm[u][v];
-        }
-    }
-
-    return g;
-}
-
-dfas dfas_construct_subgraph(dfas p, int *mask)
-{
-    int *new_id = malloc(sizeof(int) * p.N);
-    for (int i = 0; i < p.N; i++)
-        new_id[i] = -1;
-
-    int id = 0;
-    for (int u = 0; u < p.N; u++)
-        if (mask[u])
-            new_id[u] = id++;
-
-    dfas s = {.N = id};
-    s.V = malloc(sizeof(int) * (s.N + 1));
-    s.E = malloc(sizeof(int) * p.V[p.N]);
-    s.W = malloc(sizeof(int) * p.V[p.N]);
-
-    s.id_V = malloc(sizeof(int) * s.N);
-    s.id_E = malloc(sizeof(int) * p.V[p.N]);
-
-    id = 0;
-    int id_e = 0;
-    for (int u = 0; u < p.N; u++)
-    {
-        if (!mask[u])
-            continue;
-
-        int _u = id++;
-
-        s.V[_u] = id_e;
-        s.id_V[_u] = u;
-
-        for (int i = p.V[u]; i < p.V[u + 1]; i++)
-        {
-            int v = p.E[i];
-            if (!mask[v])
-                continue;
-
-            int _v = new_id[v];
-            s.E[id_e] = _v;
-            s.W[id_e] = p.W[i];
-            s.id_E[id_e] = i;
-            id_e++;
-        }
-    }
-
-    s.V[s.N] = id_e;
-    s.E = realloc(s.E, sizeof(int) * id_e);
-    s.W = realloc(s.W, sizeof(int) * id_e);
-    s.id_E = realloc(s.id_E, sizeof(int) * id_e);
-
-    free(new_id);
-    return s;
-}
-
-void dfas_free(dfas p)
-{
-    free(p.V);
-    free(p.E);
-    free(p.W);
-    free(p.id_V);
-    free(p.id_E);
+    int d1 = p->E[p->V[u]] - p->E[p->V[v]];
+    if (d1 != 0)
+        return d1;
+    return p->E[p->V[u + 1] - 1] - p->E[p->V[v + 1] - 1];
 }
 
 typedef struct
 {
-    int N;
+    int u, v;
+} edge;
+
+static inline int compare_edges(const void *a, const void *b)
+{
+    edge *e1 = (edge *)a, *e2 = (edge *)b;
+    if (e1->u != e2->u)
+        return e1->u - e2->u;
+    return e1->v - e2->v;
+}
+
+comp comp_init(int n, int *V, ocm p)
+{
+    if (n > (1 << 12))
+        return (comp){.n = -1, .W = NULL, .c = NULL, .S = NULL, .I = NULL};
+
+    comp cc = {.n = n};
+    int *data = malloc(sizeof(int) * n * n);
+    cc.W = malloc(sizeof(int *) * n);
+    for (int i = 0; i < n; i++)
+        cc.W[i] = data + i * n;
+
+    cc.c = malloc(sizeof(int));
+    cc.S = malloc(sizeof(int) * n);
+    cc.I = malloc(sizeof(int) * n);
+
+    for (int i = 0; i < n; i++)
+        cc.S[i] = i;
+
+    for (int i = 0; i < n; i++)
+        cc.I[i] = V[i];
+
+    *cc.c = 0;
+    for (int i = 0; i < n; i++)
+    {
+        cc.W[i][i] = 0;
+        int u = cc.I[i], v, uv, vu;
+        for (int j = i + 1; j < n; j++)
+        {
+            v = cc.I[j];
+            count_crossings(p.V, p.E, u, v, &uv, &vu);
+            if (uv < vu)
+            {
+                cc.W[i][j] = vu - uv;
+                cc.W[j][i] = 0;
+            }
+            else
+            {
+                *cc.c += uv - vu;
+                cc.W[j][i] = uv - vu;
+                cc.W[i][j] = 0;
+            }
+        }
+    }
+    return cc;
+}
+
+void comp_free(comp c)
+{
+    if (c.W != NULL)
+        free(*c.W);
+    free(c.W);
+    free(c.c);
+    free(c.S);
+    free(c.I);
+}
+
+typedef struct
+{
+    int n;
     int *stack, *on_stack;
-    int Id;
+    int id;
     int *index, *lowlink;
+    int *tmp;
 } tarjan;
 
-tarjan init_tarjan(int N)
+tarjan tarjan_init(int n)
 {
-    tarjan t = {.N = 0, .Id = 0};
-    t.stack = malloc(sizeof(int) * N);
-    t.on_stack = malloc(sizeof(int) * N);
-    t.index = malloc(sizeof(int) * N);
-    t.lowlink = malloc(sizeof(int) * N);
-    for (int i = 0; i < N; i++)
+    tarjan t = {.n = 0, .id = 0};
+    t.stack = malloc(sizeof(int) * n);
+    t.on_stack = malloc(sizeof(int) * n);
+    t.index = malloc(sizeof(int) * n);
+    t.lowlink = malloc(sizeof(int) * n);
+    t.tmp = malloc(sizeof(int) * n);
+    for (int i = 0; i < n; i++)
     {
         t.on_stack[i] = 0;
         t.index[i] = -1;
@@ -169,30 +139,31 @@ tarjan init_tarjan(int N)
     return t;
 }
 
-void free_tarjan(tarjan t)
+void tarjan_free(tarjan t)
 {
     free(t.stack);
     free(t.on_stack);
     free(t.index);
     free(t.lowlink);
+    free(t.tmp);
 }
 
-void tarjan_explore(int u, dfas p, tarjan *t, dfas *cc, int *ncc, int *mask)
+void tarjan_explore(int u, int *V, edge *E, tarjan *t, ocm p, comp *C, int *n)
 {
-    t->index[u] = t->Id;
-    t->lowlink[u] = t->Id;
-    t->Id += 1;
+    t->index[u] = t->id;
+    t->lowlink[u] = t->id;
+    t->id += 1;
 
-    t->stack[t->N] = u;
-    t->N += 1;
+    t->stack[t->n] = u;
+    t->n += 1;
     t->on_stack[u] = 1;
 
-    for (int i = p.V[u]; i < p.V[u + 1]; i++)
+    for (int i = V[u]; i < V[u + 1]; i++)
     {
-        int v = p.E[i];
+        int v = E[i].v;
         if (t->index[v] < 0)
         {
-            tarjan_explore(v, p, t, cc, ncc, mask);
+            tarjan_explore(v, V, E, t, p, C, n);
             if (t->lowlink[v] < t->lowlink[u])
                 t->lowlink[u] = t->lowlink[v];
         }
@@ -204,382 +175,124 @@ void tarjan_explore(int u, dfas p, tarjan *t, dfas *cc, int *ncc, int *mask)
 
     if (t->lowlink[u] == t->index[u])
     {
-        for (int i = 0; i < p.N; i++)
-            mask[i] = 0;
-
-        int v;
+        int v, c = 0;
         do
         {
-            t->N -= 1;
-            v = t->stack[t->N];
+            t->n -= 1;
+            v = t->stack[t->n];
             t->on_stack[v] = 0;
-            mask[v] = 1;
+            t->tmp[c++] = v;
         } while (v != u);
-
-        cc[(*ncc)++] = dfas_construct_subgraph(p, mask);
+        C[(*n)++] = comp_init(c, t->tmp, p);
     }
 }
 
-dfas *dfas_scc_split(dfas p, int *N)
+dfas dfas_construct(ocm p)
 {
-    dfas *cc = malloc(sizeof(dfas) * p.N);
-    *N = 0;
-    tarjan t = init_tarjan(p.N);
+    int max_edges = 200000000;
 
-    int *mask = malloc(sizeof(int) * p.N);
-    for (int u = 0; u < p.N; u++)
+    int m = 0;
+    edge *E = malloc(sizeof(edge) * (max_edges + 1));
+
+    dfas g = {.n = 0, .offset = 0};
+    g.O = malloc(sizeof(int) * p.n1);
+    for (int i = 0; i < p.n1; i++)
+        g.O[i] = i;
+
+    qsort_r(g.O, p.n1, sizeof(int), compare_ranges, &p);
+
+    for (int i = 0; i < p.n1; i++)
     {
-        if (t.index[u] < 0)
-            tarjan_explore(u, p, &t, cc, N, mask);
-    }
-
-    free(mask);
-    free_tarjan(t);
-    cc = realloc(cc, sizeof(dfas) * (*N));
-    return cc;
-}
-
-void push_cycle(void *solver, int N, int *cycle)
-{
-    for (int i = 0; i < N; i++)
-        ipamir_add_hard(solver, cycle[i] + 1);
-    ipamir_add_hard(solver, 0);
-}
-
-int cycle_explore(dfas g, void *solver, int *sat, int d, int *e, int *v, int *visited, int *on_stack, int max_l, int *any)
-{
-    int u = v[d];
-    int res = 0;
-    for (int i = g.V[u]; i < g.V[u + 1]; i++)
-    {
-        if (sat[i])
+        int u = g.O[i];
+        if (p.V[u + 1] - p.V[u] <= 1)
             continue;
 
-        e[d] = i;
-        int w = g.E[i];
-        if (on_stack[w]) // cycle
+        for (int j = i + 1; j < p.n1; j++)
         {
-            int offset = 0;
-            while (v[offset] != w)
-                offset++;
-            int size = (d - offset) + 1;
-            if (size <= max_l)
+            int v = g.O[j];
+            if (p.E[p.V[u + 1] - 1] <= p.E[p.V[v]])
+                break;
+
+            int c_uv = 0, c_vu = 0;
+            count_crossings(p.V, p.E, u, v, &c_uv, &c_vu);
+
+            if (c_uv != c_vu)
             {
-                push_cycle(solver, size, e + offset);
-                res++;
-            }
-            *any = 1;
-        }
-        else if (!visited[w])
-        {
-            visited[w] = 1;
-            on_stack[w] = 1;
-            v[d + 1] = w;
-            res += cycle_explore(g, solver, sat, d + 1, e, v, visited, on_stack, max_l, any);
-            on_stack[w] = 0;
-        }
-    }
-
-    return res;
-}
-
-void shuffle(int *array, size_t n)
-{
-    if (n > 1)
-    {
-        size_t i;
-        for (i = 0; i < n - 1; i++)
-        {
-            size_t j = i + rand() / (RAND_MAX / (n - i) + 1);
-            int t = array[j];
-            array[j] = array[i];
-            array[i] = t;
-        }
-    }
-}
-
-int add_cycles(dfas g, void *solver, int *sat, int max_l, int *any)
-{
-    int *visited = malloc(sizeof(int) * g.N);
-    for (int i = 0; i < g.N; i++)
-        visited[i] = 0;
-
-    int *on_stack = malloc(sizeof(int) * g.N);
-    for (int i = 0; i < g.N; i++)
-        on_stack[i] = 0;
-
-    int *order = malloc(sizeof(int) * g.N);
-    for (int i = 0; i < g.N; i++)
-        order[i] = i;
-    shuffle(order, g.N);
-
-    int *e = malloc(sizeof(int) * g.N);
-    int *v = malloc(sizeof(int) * g.N);
-
-    int n_cycles = 0;
-    for (int i = 0; i < g.N; i++)
-    {
-        int u = order[i];
-        if (visited[u])
-            continue;
-
-        v[0] = u;
-        visited[u] = 1;
-        on_stack[u] = 1;
-        n_cycles += cycle_explore(g, solver, sat, 0, e, v, visited, on_stack, max_l, any);
-        on_stack[u] = 0;
-    }
-    free(visited);
-    free(on_stack);
-    free(e);
-    free(v);
-    return n_cycles;
-}
-
-int add_4_cycles(dfas g, void *solver)
-{
-    int res = 0;
-    int cycle[4];
-    for (int u = 0; u < g.N; u++)
-    {
-        for (int i = g.V[u]; i < g.V[u + 1]; i++)
-        {
-            int v = g.E[i];
-            if (v < u)
-                continue;
-
-            for (int j = g.V[v]; j < g.V[v + 1]; j++)
-            {
-                int w = g.E[j];
-                if (w < u)
-                    continue;
-
-                for (int k = g.V[w]; k < g.V[w + 1]; k++)
+                if (m >= max_edges)
                 {
-                    int x = g.E[k];
-                    if (x < u)
-                        continue;
-
-                    if (x == u) // && drand48() > 0.9)
-                    {
-                        cycle[0] = i;
-                        cycle[1] = j;
-                        cycle[2] = k;
-                        push_cycle(solver, 3, cycle);
-                        res++;
-                    }
-                    else if (x != u)
-                    {
-                        int adj_v = 0, adj_u = 0;
-                        for (int l = g.V[x]; l < g.V[x + 1]; l++)
-                        {
-                            if (g.E[l] == u)
-                            {
-                                cycle[3] = l;
-                                adj_u = 1;
-                            }
-                            else if (g.E[l] == v)
-                                adj_v = 1;
-                        }
-                        if (adj_u && !adj_v) // && drand48() > 0.999)
-                        {
-                            cycle[0] = i;
-                            cycle[1] = j;
-                            cycle[2] = k;
-                            push_cycle(solver, 4, cycle);
-                            res++;
-                        }
-                    }
+                    free(E);
+                    return (dfas){.n = -1, .C = NULL, .O = NULL, .offset = 0};
                 }
+
+                if (c_uv < c_vu)
+                    E[m] = (edge){.u = u, .v = v};
+                else
+                    E[m] = (edge){.u = v, .v = u};
+                m++;
+
+                if (c_uv < c_vu)
+                    g.offset += c_uv;
+                else
+                    g.offset += c_vu;
+            }
+            else
+            {
+                g.offset += c_uv;
             }
         }
     }
-    return res;
-}
 
-int *dfas_solve(dfas g, int *c)
-{
-    int *sat = malloc(sizeof(int) * g.V[g.N]);
-    for (int i = 0; i < g.V[g.N]; i++)
-        sat[i] = 0;
+    qsort(E, m, sizeof(edge), compare_edges);
+    E[m] = (edge){.u = p.n1, .v = p.n1};
 
-    void *solver = ipamir_init();
-    for (int i = 0; i < g.V[g.N]; i++)
-        ipamir_add_soft_lit(solver, i + 1, g.W[i]);
+    int *V = malloc(sizeof(int) * (p.n1 + 1));
 
-    int K = add_4_cycles(g, solver);
-    int any = K > 0, max_l = 4;
-    int C = K;
-
-    // printf("Starting problem of size %d\n", g.V[g.N]);
-
-    while (any)
+    m = 0;
+    V[0] = 0;
+    for (int u = 0; u < p.n1; u++)
     {
-        // printf("%d %d %d", K, C, max_l);
-        // fflush(stdout);
-        int rc = ipamir_solve(solver);
-        // printf(" %d %ld\n", rc, ipamir_val_obj(solver));
-
-        for (int i = 0; i < g.V[g.N]; i++)
-            sat[i] = ipamir_val_lit(solver, i + 1) > 0;
-
-        *c = ipamir_val_obj(solver);
-
-        any = 0;
-        K = add_cycles(g, solver, sat, max_l, &any);
-        C += K;
-        while (K == 0 && any)
-        {
-            max_l++;
-            any = 0;
-            K = add_cycles(g, solver, sat, max_l, &any);
-            C += K;
-        }
+        while (E[m].u == u)
+            m++;
+        V[u + 1] = m;
     }
 
-    ipamir_release(solver);
+    tarjan t = tarjan_init(p.n1);
+    g.C = malloc(sizeof(comp) * p.n1);
+    for (int i = p.n1 - 1; i >= 0; i--)
+    {
+        int u = g.O[i];
+        if (t.index[u] < 0)
+            tarjan_explore(u, V, E, &t, p, g.C, &g.n);
+    }
+    g.C = realloc(g.C, sizeof(comp) * g.n);
 
-    return sat;
+    free(E);
+    free(V);
+    tarjan_free(t);
+
+    return g;
 }
 
-// int cycle_explore_masked(dfas g, void *solver, int *sat, int d, int *e, int *v, int *visited, int *on_stack, int max_l, int *any, int *mask)
-// {
-//     int u = v[d];
-//     int res = 0;
-//     for (int i = g.V[u]; i < g.V[u + 1]; i++)
-//     {
-//         if (sat[i])
-//             continue;
+void dfas_free(dfas g)
+{
+    for (int i = 0; i < g.n; i++)
+        comp_free(g.C[i]);
+    free(g.C);
+    free(g.O);
+}
 
-//         e[d] = i;
-//         int w = g.E[i];
-//         v[d + 1] = w;
-//         if (on_stack[w]) // cycle
-//         {
-//             int offset = 0;
-//             while (v[offset] != w)
-//                 offset++;
-//             int size = (d - offset) + 1;
+int *dfas_get_solution(ocm p, dfas g)
+{
 
-//             int valid = 0;
-//             for (int j = 0; j < size; j++)
-//                 if (mask[v[offset + j]] && mask[v[offset + j + 1]])
-//                     valid = 1;
-//             if (!valid)
-//                 continue;
-
-//             if (size <= max_l)
-//             {
-//                 for (int j = 0; j < size; j++)
-//                 {
-//                     if (mask[v[offset + j]] && mask[v[offset + j + 1]])
-//                     {
-//                         ipamir_add_hard(solver, e[offset + j] + 1);
-//                     }
-//                 }
-//                 ipamir_add_hard(solver, 0);
-//                 res++;
-//             }
-//             *any = 1;
-//         }
-//         else if (!visited[w])
-//         {
-//             visited[w] = 1;
-//             on_stack[w] = 1;
-//             res += cycle_explore_masked(g, solver, sat, d + 1, e, v, visited, on_stack, max_l, any, mask);
-//             on_stack[w] = 0;
-//         }
-//     }
-
-//     return res;
-// }
-
-// int add_cycles_masked(dfas g, void *solver, int *sat, int max_l, int *any, int *mask)
-// {
-//     int *visited = malloc(sizeof(int) * g.N);
-//     for (int i = 0; i < g.N; i++)
-//         visited[i] = 0;
-
-//     int *on_stack = malloc(sizeof(int) * g.N);
-//     for (int i = 0; i < g.N; i++)
-//         on_stack[i] = 0;
-
-//     int *order = malloc(sizeof(int) * g.N);
-//     for (int i = 0; i < g.N; i++)
-//         order[i] = i;
-//     shuffle(order, g.N);
-
-//     int *e = malloc(sizeof(int) * g.N);
-//     int *v = malloc(sizeof(int) * g.N);
-
-//     int n_cycles = 0;
-//     for (int i = 0; i < g.N; i++)
-//     {
-//         int u = order[i];
-//         if (visited[u])
-//             continue;
-
-//         v[0] = u;
-//         visited[u] = 1;
-//         on_stack[u] = 1;
-//         n_cycles += cycle_explore_masked(g, solver, sat, 0, e, v, visited, on_stack, max_l, any, mask);
-//         on_stack[u] = 0;
-//     }
-//     free(visited);
-//     free(on_stack);
-//     free(e);
-//     free(v);
-//     return n_cycles;
-// }
-
-// int *dfas_solve_closed(dfas g, int *mask, int c1, int *c2)
-// {
-//     int *sat = malloc(sizeof(int) * g.V[g.N]);
-//     for (int i = 0; i < g.V[g.N]; i++)
-//         sat[i] = 0;
-
-//     void *solver = ipamir_init();
-//     for (int u = 0; u < g.N; u++)
-//         for (int i = g.V[u]; i < g.V[u + 1]; i++)
-//             if (mask[u] && mask[g.E[i]])
-//                 ipamir_add_soft_lit(solver, i + 1, g.W[i]);
-
-//     int any = 0, max_l = 4;
-//     int K = add_cycles_masked(g, solver, sat, max_l, &any, mask);
-//     int C = K;
-
-//     // printf("Starting problem of size %d\n", g.V[g.N]);
-
-//     while (any)
-//     {
-//         // printf("%d %d %d", K, C, max_l);
-//         // fflush(stdout);
-//         int rc = ipamir_solve(solver);
-//         // printf(" %d %ld\n", rc, ipamir_val_obj(solver));
-
-//         for (int u = 0; u < g.N; u++)
-//             for (int i = g.V[u]; i < g.V[u + 1]; i++)
-//                 if (mask[u] && mask[g.E[i]])
-//                     sat[i] = ipamir_val_lit(solver, i + 1) > 0;
-
-//         *c2 = ipamir_val_obj(solver);
-
-//         if (*c2 > c1)
-//             break;
-
-//         any = 0;
-//         K = add_cycles_masked(g, solver, sat, max_l, &any, mask);
-//         C += K;
-//         while (K == 0 && any)
-//         {
-//             max_l++;
-//             any = 0;
-//             K = add_cycles_masked(g, solver, sat, max_l, &any, mask);
-//             C += K;
-//         }
-//     }
-
-//     ipamir_release(solver);
-
-//     return sat;
-// }
+    int *S = malloc(sizeof(int) * p.n1);
+    int _i = p.n1;
+    for (int i = 0; i < g.n; i++)
+    {
+        _i -= g.C[i].n;
+        for (int j = 0; j < g.C[i].n; j++)
+        {
+            S[_i + j] = g.C[i].I[g.C[i].S[j]];
+        }
+    }
+    return S;
+}

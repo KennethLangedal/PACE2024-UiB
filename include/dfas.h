@@ -1,25 +1,57 @@
 #pragma once
-
 #include "ocm.h"
-
-#include <stdio.h>
 
 typedef struct
 {
-    int N;
-    int *V, *E, *W;
+    int n;   // Vertices in component
+    int **W; // Adjacency matrix
+    int *c;  // Current solution cost
+    int *S;  // Current solution
+    int *I;  // Old ID
+} comp;
 
-    int *id_V, *id_E;
+typedef struct
+{
+    int n;      // Number of strongly connected components
+    int offset; // Number of unavoidable crossings
+    int *O;     // Vertex ordering based on ranges
+    comp *C;    // Components
 } dfas;
 
-dfas dfas_construct_instance(ocm p);
+dfas dfas_construct(ocm p);
 
-dfas dfas_construct_subgraph(dfas p, int *mask);
+void dfas_free(dfas g);
 
-void dfas_free(dfas p);
+int *dfas_get_solution(ocm p, dfas g);
 
-dfas *dfas_scc_split(dfas p, int *N);
+// typedef struct
+// {
+//     int n, offset;
+//     int *V, *E, *W;
 
-int *dfas_solve(dfas p, int *c);
+//     int *ID_V, *ID_E;
+// } dfas;
 
-// int *dfas_solve_closed(dfas p, int *mask, int c1, int *c2);
+// typedef struct
+// {
+//     int n;
+//     dfas *C;
+// } scc_split;
+
+// dfas dfas_construct(ocm p, int max_edges);
+
+// dfas dfas_transpose(dfas g);
+
+// void dfas_free(dfas g);
+
+// void dfas_free_scc_split(scc_split cc);
+
+// dfas dfas_construct_subgraph(dfas g, int *mask);
+
+// scc_split dfas_scc_split(dfas g);
+
+// void dfas_lift_scc(dfas g, int *Sc, int *S);
+
+// int *dfas_lift_solution(ocm p, dfas g, int *S);
+
+// int dfas_eval_solution(ocm p, int *O);

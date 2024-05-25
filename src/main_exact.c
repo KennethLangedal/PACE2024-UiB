@@ -1,100 +1,53 @@
-#include "graph.h"
 #include "ocm.h"
 #include "dfas.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <dirent.h>
-
-int *solve(graph g)
-{
-    graph gz = remove_degree_zero(g);
-    graph gt = remove_twins(gz);
-
-    ocm p = init_ocm_problem(gt);
-    ocm_reduction_trivial(&p);
-
-    dfas dp = dfas_construct_instance(p);
-
-    int N = 0;
-    dfas *cc = dfas_scc_split(dp, &N);
-
-    int c;
-    for (int i = 0; i < N; i++)
-    {
-        if (cc[i].N < 3)
-            continue;
-
-        int *s = dfas_solve(cc[i], &c);
-        for (int u = 0; u < cc[i].N; u++)
-        {
-            for (int j = cc[i].V[u]; j < cc[i].V[u + 1]; j++)
-            {
-                int v = cc[i].E[j];
-                if (s[j])
-                    ocm_add_edge_avx(&p, cc[i].id_V[v], cc[i].id_V[u]);
-            }
-        }
-        free(s);
-        dfas_free(cc[i]);
-    }
-    free(cc);
-    dfas_free(dp);
-
-    // Give order to rest
-    for (int i = 0; i < gt.B; i++)
-        for (int j = 0; j < gt.B; j++)
-            if (!p.tc[i][j] && !p.tc[j][i] && p.cm[i][j] < p.cm[j][i])
-                ocm_add_edge_avx(&p, i, j);
-
-    // Give order to equal pairs
-    for (int i = 0; i < gt.B; i++)
-        for (int j = i + 1; j < gt.B; j++)
-            if (!p.tc[i][j] && !p.tc[j][i])
-                ocm_add_edge_avx(&p, i, j);
-
-    int *s = malloc(sizeof(int) * gt.B);
-    for (int i = 0; i < gt.B; i++)
-        s[i] = -1;
-
-    for (int i = 0; i < gt.B; i++)
-    {
-        int d = 0;
-        for (int j = 0; j < gt.B; j++)
-            if (p.tc[i][j])
-                d++;
-        s[gt.B - d] = i + gt.A;
-    }
-
-    free_ocm_problem(p);
-
-    lift_solution_twins(gz, gt, &s);
-    lift_solution_degree_zero(g, gz, &s);
-
-    free_graph(gt);
-    free_graph(gz);
-
-    return s;
-}
-
 int main(int argc, char **argv)
 {
-    FILE *f = fopen(argv[1], "r");
-    graph g = parse_graph(f);
-    fclose(f);
+    ocm p = ocm_parse(stdin);
 
-    int *s = solve(g);
+    dfas g = dfas_construct(p, 2000000);
+    if (g.n < 0)
+    {
+        fprintf(stderr, "Aborted\n");
+    }
+    else
+    {
+        int *S = malloc(sizeof(int) * g.V[g.n]);
+        for (int i = 0; i < g.V[g.n]; i++)
+            S[i] = 0;
 
-    // printf("%d\n", count_crossings(g, s));
+        scc_split cc = dfas_scc_split(g);
 
-    f = fopen(argv[2], "w");
-    for (int i = 0; i < g.B; i++)
-        fprintf(f, "%d\n", s[i] + 1);
-    fclose(f);
+        int solved = 1, max = 0;
+        for (int i = 0; i < cc.n; i++)
+        {
+            if (cc.C[i].n > 2)
+                solved = 0;
+            if (cc.C[i].n > cc.C[max].n)
+                max = i;
+        }
 
-    free_graph(g);
-    free(s);
+        if (solved)
+        {
+            fprintf(stderr, "Graph solver by scc %d %d\n", g.n, g.V[g.n]);
+            int *res = dfas_lift_solution(p, g, S);
+            for (int i = 0; i < g.n; i++)
+                printf("%d\n", p.n0 + res[i] + 1);
+            free(res);
+        }
+        else
+        {
+            fprintf(stderr, "Max component %d %d\n", cc.C[max].n, cc.C[max].V[cc.C[max].n]);
+        }
 
+        free(S);
+        dfas_free_scc_split(cc);
+    }
+
+    ocm_free(p);
+    dfas_free(g);
     return 0;
 }

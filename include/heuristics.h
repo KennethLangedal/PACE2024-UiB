@@ -1,11 +1,14 @@
 #pragma once
-
-#include "graph.h"
-#include "ocm.h"
 #include "dfas.h"
 
-int dfas_simulated_annealing(dfas p, int *s);
+void heuristics_greedy_improvement(comp c);
 
-void ocm_simulated_annealing(ocm *p);
+void heuristics_greedy_cut(comp c);
 
-int simulated_annealing(graph g, int *s);
+void heuristic_randomize_solution(comp c, int changes);
+
+// int *heuristics_greedy(dfas g, int max_it, volatile sig_atomic_t *term);
+
+// int *heuristics_random_local_search(dfas g, int max_it, volatile sig_atomic_t *term);
+
+// int *heuristics_token_swapping(dfas g, dfas gt, int max_it, volatile sig_atomic_t *term);
