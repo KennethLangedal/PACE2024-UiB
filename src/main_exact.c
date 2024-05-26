@@ -1,50 +1,89 @@
 #include "ocm.h"
 #include "dfas.h"
+#include "tiny_solver.h"
+#include "heuristics.h"
+#include "exact.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 
 int main(int argc, char **argv)
 {
-    ocm p = ocm_parse(stdin);
+    FILE *f = fopen(argv[1], "r");
+    ocm p = ocm_parse(f);
+    fclose(f);
+    dfas g = dfas_construct(p);
+    int valid = g.n > 0;
+    for (int i = 0; i < g.n; i++)
+        if (g.C[i].n < 0)
+            valid = 0;
 
-    dfas g = dfas_construct(p, 2000000);
-    if (g.n < 0)
+    if (!valid)
     {
-        fprintf(stderr, "Aborted\n");
+        fprintf(stderr, "%s, failed\n", argv[1]);
     }
     else
     {
-        int *S = malloc(sizeof(int) * g.V[g.n]);
-        for (int i = 0; i < g.V[g.n]; i++)
-            S[i] = 0;
-
-        scc_split cc = dfas_scc_split(g);
-
-        int solved = 1, max = 0;
-        for (int i = 0; i < cc.n; i++)
+        int solved = 1;
+        for (int i = 0; i < g.n; i++)
         {
-            if (cc.C[i].n > 2)
-                solved = 0;
-            if (cc.C[i].n > cc.C[max].n)
-                max = i;
+            comp c = g.C[i];
+            if (c.n > 1 && c.n <= 20)
+                tiny_solver_solve(c);
+            else if (c.n > 20)
+            {
+                int *best = malloc(sizeof(int) * c.n);
+                for (int j = 0; j < c.n; j++)
+                    best[j] = c.S[j];
+                int best_cost = *c.c;
+
+                for (int t = 0; t < 50; t++)
+                {
+                    heuristic_randomize_solution(c, (rand() % 4) + 1);
+                    heuristics_greedy_improvement(c);
+                    tiny_solver_sliding_solve(c, 8);
+
+                    int old_c = *c.c + 1;
+                    while (old_c > *c.c)
+                    {
+                        old_c = *c.c;
+                        heuristics_greedy_cut(c);
+                    }
+
+                    if (*c.c < best_cost)
+                    {
+                        for (int j = 0; j < c.n; j++)
+                            best[j] = c.S[j];
+                        best_cost = *c.c;
+                        fprintf(stderr, "%d %d\n", t, *c.c);
+                    }
+                    else if (*c.c > best_cost)
+                    {
+                        *c.c = best_cost;
+                        for (int j = 0; j < c.n; j++)
+                            c.S[j] = best[j];
+                    }
+                }
+                fprintf(stderr, "%d\n", *c.c);
+
+                if (!solve_lazy(c))
+                    solved = 0;
+            }
         }
 
         if (solved)
         {
-            fprintf(stderr, "Graph solver by scc %d %d\n", g.n, g.V[g.n]);
-            int *res = dfas_lift_solution(p, g, S);
-            for (int i = 0; i < g.n; i++)
-                printf("%d\n", p.n0 + res[i] + 1);
-            free(res);
+            int *S = dfas_get_solution(p, g);
+            f = fopen(argv[2], "w");
+            for (int i = 0; i < p.n1; i++)
+                fprintf(f, "%d\n", p.n0 + S[i] + 1);
+            fclose(f);
+            free(S);
         }
         else
         {
-            fprintf(stderr, "Max component %d %d\n", cc.C[max].n, cc.C[max].V[cc.C[max].n]);
+            fprintf(stderr, "Failed to solve\n");
         }
-
-        free(S);
-        dfas_free_scc_split(cc);
     }
 
     ocm_free(p);

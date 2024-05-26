@@ -70,6 +70,23 @@ int main(int argc, char **argv)
                         c.S[j] = best[j];
                 }
             }
+
+            // f = fopen("g.csv", "w");
+            // fprintf(f, "source;target;weight;broken\n");
+            // for (int j = 0; j < c.n; j++)
+            // {
+            //     int u = c.S[j];
+            //     for (int k = j + 1; k < c.n; k++)
+            //     {
+            //         int v = c.S[k];
+            //         if (c.W[u][v] > 0)
+            //             fprintf(f, "%d;%d;%d;%d\n", u, v, c.W[u][v], 0);
+            //         else if (c.W[v][u] > 0)
+            //             fprintf(f, "%d;%d;%d;%d\n", v, u, c.W[v][u], 1);
+            //     }
+            // }
+            // fclose(f);
+
             printf("%d\n", lower_bound_greedy(c));
         }
 
