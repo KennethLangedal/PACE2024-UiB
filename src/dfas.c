@@ -88,7 +88,18 @@ comp comp_init(int n, int *V, ocm p)
         {
             v = cc.I[j];
             count_crossings(p.V, p.E, u, v, &uv, &vu);
-            if (uv < vu)
+            if (uv == 0)
+            {
+                cc.W[i][j] = vu * 100;
+                cc.W[j][i] = 0;
+            }
+            else if (vu == 0)
+            {
+                *cc.c += uv - vu;
+                cc.W[j][i] = uv * 100;
+                cc.W[i][j] = 0;
+            }
+            else if (uv < vu)
             {
                 cc.W[i][j] = vu - uv;
                 cc.W[j][i] = 0;

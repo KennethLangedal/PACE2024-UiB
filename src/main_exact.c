@@ -32,6 +32,7 @@ int main(int argc, char **argv)
                 tiny_solver_solve(c);
             else if (c.n > 20)
             {
+                fprintf(stderr, "%d\n", c.n);
                 int *best = malloc(sizeof(int) * c.n);
                 for (int j = 0; j < c.n; j++)
                     best[j] = c.S[j];
@@ -66,8 +67,17 @@ int main(int argc, char **argv)
                 }
                 fprintf(stderr, "%d\n", *c.c);
 
-                if (!solve_lazy(c))
-                    solved = 0;
+                for (int j = 0; j < c.n; j++)
+                {
+                    printf("[%d", c.W[c.S[j]][c.S[0]]);
+                    for (int k = 1; k < c.n; k++)
+                        printf(", %d", c.W[c.S[j]][c.S[k]]);
+                    printf("],\n");
+                }
+                return 0;
+
+                // if (!solve_lazy(c))
+                //     solved = 0;
             }
         }
 

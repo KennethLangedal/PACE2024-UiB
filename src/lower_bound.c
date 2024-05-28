@@ -173,3 +173,7 @@ int lower_bound_greedy(comp c)
 
     return 0;
 */
+
+int lower_bound_flow_check(comp c)
+{
+}
