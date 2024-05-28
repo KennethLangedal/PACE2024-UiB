@@ -104,7 +104,7 @@ comp comp_init(int n, int *V, ocm p)
     return cc;
 }
 
-void comp_free(comp c)
+void dfas_free_comp(comp c)
 {
     if (c.W != NULL)
         free(*c.W);
@@ -276,9 +276,59 @@ dfas dfas_construct(ocm p)
 void dfas_free(dfas g)
 {
     for (int i = 0; i < g.n; i++)
-        comp_free(g.C[i]);
+        dfas_free_comp(g.C[i]);
     free(g.C);
     free(g.O);
+}
+
+comp dfas_construct_subgraph(comp c, int *E, int m)
+{
+    int *new_id = malloc(sizeof(int) * c.n);
+    for (int i = 0; i < c.n; i++)
+        new_id[i] = -1;
+    int n = 0;
+    for (int i = 0; i < m; i++)
+    {
+        int u = E[i] / c.n;
+        int v = E[i] % c.n;
+        if (new_id[u] < 0)
+            new_id[u] = n++;
+        if (new_id[v] < 0)
+            new_id[v] = n++;
+    }
+
+    int *data = malloc(sizeof(int) * n * n);
+    int **W = malloc(sizeof(int *) * n);
+    for (int i = 0; i < n; i++)
+        W[i] = data + i * n;
+
+    int *cr = malloc(sizeof(int));
+    *cr = 0;
+    int *S = malloc(sizeof(int) * n);
+    int *I = malloc(sizeof(int) * n);
+    for (int i = 0; i < n; i++)
+        I[i] = -1;
+
+    for (int i = 0; i < m; i++)
+    {
+        int u = E[i] / c.n;
+        int v = E[i] % c.n;
+        I[new_id[u]] = u;
+        I[new_id[v]] = v;
+
+        W[new_id[u]][new_id[v]] = c.W[u][v];
+    }
+
+    for (int i = 0; i < n; i++)
+    {
+        S[i] = i;
+        for (int j = i + 1; j < n; j++)
+            *cr += W[j][i];
+    }
+
+    free(new_id);
+
+    return (comp){.n = n, .W = W, .c = cr, .S = S, .I = I};
 }
 
 int *dfas_get_solution(ocm p, dfas g)

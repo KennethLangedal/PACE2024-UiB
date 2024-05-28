@@ -22,4 +22,8 @@ dfas dfas_construct(ocm p);
 
 void dfas_free(dfas g);
 
+comp dfas_construct_subgraph(comp c, int *E, int m);
+
+void dfas_free_comp(comp c);
+
 int *dfas_get_solution(ocm p, dfas g);
