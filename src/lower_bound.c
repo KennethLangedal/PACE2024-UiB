@@ -177,3 +177,105 @@ int lower_bound_greedy(comp c)
 int lower_bound_flow_check(comp c)
 {
 }
+
+void lb_explore(int **C, int n, int *order, int *visided, int *on_stack, int *prev, int *cycle, int u, int *lb, int max_length)
+{
+    visided[u] = 1;
+    on_stack[u] = 1;
+    for (int _i = 0; _i < n; _i++)
+    {
+        int v = order[_i];
+        if (C[u][v] == 0)
+            continue;
+
+        if (on_stack[v])
+        {
+            int min = C[u][v];
+            int m = 0, x = u, y = v;
+            do
+            {
+                cycle[m++] = x * n + y;
+                min = min > C[x][y] ? C[x][y] : min;
+                y = x;
+                x = prev[x];
+            } while (y != v);
+
+            if (min > 0 && m <= max_length)
+            {
+                *lb += min;
+                for (int i = 0; i < m; i++)
+                    (*C)[cycle[i]] -= min;
+            }
+        }
+        else if (!visided[v])
+        {
+            prev[v] = u;
+            lb_explore(C, n, order, visided, on_stack, prev, cycle, v, lb, max_length);
+        }
+    }
+    on_stack[u] = 0;
+}
+
+void lb_shuffle(int *array, int n)
+{
+    for (int i = 0; i < n - 1; i++)
+    {
+        int j = i + rand() / (RAND_MAX / (n - i) + 1);
+        int t = array[j];
+        array[j] = array[i];
+        array[i] = t;
+    }
+}
+
+int lower_bound_cycle_packing(comp c)
+{
+    int *data = malloc(sizeof(int) * c.n * c.n);
+    int **C = malloc(sizeof(int *) * c.n);
+    for (int i = 0; i < c.n; i++)
+        C[i] = data + i * c.n;
+
+    for (int i = 0; i < c.n; i++)
+        for (int j = 0; j < c.n; j++)
+            C[i][j] = c.W[i][j];
+
+    int *visited = malloc(sizeof(int) * c.n);
+    int *on_stack = malloc(sizeof(int) * c.n);
+    int *prev = malloc(sizeof(int) * c.n);
+    int *cycle = malloc(sizeof(int) * c.n);
+    int *order = malloc(sizeof(int) * c.n);
+    for (int i = 0; i < c.n; i++)
+        order[i] = i;
+
+    lb_shuffle(order, c.n);
+
+    int lb = 0;
+
+    int max_length = 3;
+    while (max_length < c.n)
+    {
+        for (int i = 0; i < c.n; i++)
+        {
+            visited[i] = 0;
+            on_stack[i] = 0;
+            prev[i] = -1;
+        }
+
+        int before = lb;
+        for (int u = 0; u < c.n; u++)
+            if (!visited[order[u]])
+                lb_explore(C, c.n, order, visited, on_stack, prev, cycle, order[u], &lb, max_length);
+
+        if (before == lb)
+            max_length++;
+    }
+
+    free(data);
+    free(C);
+    free(visited);
+    free(on_stack);
+    free(prev);
+    free(cycle);
+    free(order);
+
+    return lb;
+}

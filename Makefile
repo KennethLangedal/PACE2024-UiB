@@ -4,7 +4,7 @@ CC = gcc
 # CFLAGS = -g -std=gnu17 -O3 -march=haswell -I include -D _GNU_SOURCE -static
 CFLAGS = -g -std=gnu17 -O3 -march=native -I include -D _GNU_SOURCE
 
-OBJ_EXACT = main_exact.o ocm.o dfas.o exact.o tiny_solver.o heuristics.o
+OBJ_EXACT = main_exact.o ocm.o dfas.o tiny_solver.o heuristics.o lower_bound.o
 OBJ_HEURISTIC = main_heuristic.o ocm.o dfas.o tiny_solver.o heuristics.o lower_bound.o
 
 OBJ_EXACT := $(addprefix bin/, $(OBJ_EXACT))
@@ -21,8 +21,8 @@ all : exact heuristic
 -include $(DEP:.o=.d)
 
 exact : $(OBJ_EXACT)
-	g++ -o $@ $^ bin/libipamirEvalMaxSAT2022.a -lm -lz --static
-	
+	$(CC) $(CFLAGS) -o $@ $^ -lglpk -lm
+
 heuristic : $(OBJ_HEURISTIC)
 	$(CC) $(CFLAGS) -o $@ $^ -lm
 
