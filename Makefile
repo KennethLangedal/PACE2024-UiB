@@ -24,7 +24,7 @@ exact : $(OBJ_EXACT)
 	$(CC) $(CFLAGS) -o $@ $^ -lglpk -lm
 
 heuristic : $(OBJ_HEURISTIC)
-	$(CC) $(CFLAGS) -o $@ $^ -lm
+	$(CC) $(CFLAGS) -o $@ $^ -lglpk -lm
 
 bin/%.o : %.c
 	$(CC) $(CFLAGS) -MMD -c $< -o $@

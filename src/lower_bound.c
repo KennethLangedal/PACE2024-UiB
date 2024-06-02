@@ -1,11 +1,12 @@
 #include "lower_bound.h"
+#include "glpk.h"
 
 #include <stdlib.h>
 
 typedef struct
 {
     int n, w;
-    int e[5];
+    int e[8];
 } cycle;
 
 void set_weight(int *W, cycle *c)
@@ -278,4 +279,205 @@ int lower_bound_cycle_packing(comp c)
     free(order);
 
     return lb;
+}
+
+const int MC = 4000;
+
+void lp_explore(int **C, int **E, int n, int *visided, int *on_stack, int *prev, cycle *S, int *s, int u, int max_length)
+{
+    visided[u] = 1;
+    on_stack[u] = 1;
+    for (int v = 0; v < n; v++)
+    {
+        if (C[u][v] == 0 || E[u][v] >= MC * C[u][v])
+            continue;
+
+        if (on_stack[v])
+        {
+            int m = 0, x = u, y = v;
+            cycle c = {.n = 0};
+            do
+            {
+                if (E[x][y] >= MC * C[x][y])
+                    break;
+                c.e[m++] = x * n + y;
+                y = x;
+                x = prev[x];
+            } while (y != v && m < max_length);
+
+            if (y == v)
+            {
+                S[(*s)++] = c;
+                for (int i = 0; i < m; i++)
+                    (*E)[c.e[i]]++;
+            }
+        }
+        else if (!visided[v])
+        {
+            prev[v] = u;
+            lp_explore(C, E, n, visided, on_stack, prev, S, s, v, max_length);
+        }
+    }
+    on_stack[u] = 0;
+}
+
+void lower_bound_cycle_packing_lp(comp c)
+{
+    const int max_c = 50000000;
+    int n = 0;
+    int ne = 0;
+    cycle *C = malloc(sizeof(cycle) * max_c);
+
+    int *_E = malloc(sizeof(int) * c.n * c.n);
+    int **E = malloc(sizeof(int *) * c.n);
+    for (int i = 0; i < c.n; i++)
+        E[i] = _E + i * c.n;
+
+    for (int i = 0; i < c.n * c.n; i++)
+        _E[i] = 0;
+
+    for (int u = 0; u < c.n; u++)
+    {
+        for (int v = u + 1; v < c.n; v++)
+        {
+            if (c.W[u][v] == 0)
+                continue;
+
+            for (int w = u + 1; w < c.n; w++)
+            {
+                if (c.W[v][w] == 0)
+                    continue;
+
+                if (c.W[w][u] > 0)
+                {
+                    if (E[u][v] < MC * c.W[u][v] && E[v][w] < MC * c.W[v][w] && MC * E[w][u] < MC * c.W[w][u])
+                    {
+                        E[u][v]++;
+                        E[v][w]++;
+                        E[w][u]++;
+                        int e1 = u * c.n + v, e2 = v * c.n + w, e3 = w * c.n + u;
+                        C[n++] = (cycle){.n = 3, .e = {e1, e2, e3}};
+                        // set_weight(*c.W, &C[n - 1]);
+                        ne += 3;
+                    }
+                }
+
+                for (int x = u + 1; x < c.n; x++)
+                {
+                    if (c.W[w][x] == 0)
+                        continue;
+
+                    if (c.W[x][u] > 0)
+                    {
+                        if (E[u][v] < MC * c.W[u][v] && E[v][w] < MC * c.W[v][w] && E[w][x] < MC * c.W[w][x] && E[x][u] < MC * c.W[x][u])
+                        {
+                            E[u][v]++;
+                            E[v][w]++;
+                            E[w][x]++;
+                            E[x][u]++;
+                            C[n++] = (cycle){.n = 4, .e = {u * c.n + v, v * c.n + w, w * c.n + x, x * c.n + u}};
+                            // set_weight(*c.W, &C[n - 1]);
+                            ne += 4;
+                        }
+                    }
+
+                    for (int y = u + 1; y < c.n; y++)
+                    {
+                        if (c.W[x][y] == 0)
+                            continue;
+
+                        if (c.W[y][u] > 0)
+                        {
+                            if (E[u][v] < MC * c.W[u][v] && E[v][w] < MC * c.W[v][w] && E[w][x] < MC * c.W[w][x] && E[x][y] < MC * c.W[x][y] && E[y][u] < MC * c.W[y][u])
+                            {
+                                E[u][v]++;
+                                E[v][w]++;
+                                E[w][x]++;
+                                E[x][y]++;
+                                E[y][u]++;
+                                C[n++] = (cycle){.n = 5, .e = {u * c.n + v, v * c.n + w, w * c.n + x, x * c.n + y, y * c.n + u}};
+                                // set_weight(*c.W, &C[n - 1]);
+                                ne += 5;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    printf("%d\n", n);
+
+    // int *visited = malloc(sizeof(int) * c.n);
+    // int *on_stack = malloc(sizeof(int) * c.n);
+    // int *prev = malloc(sizeof(int) * c.n);
+    // for (int i = 0; i < c.n; i++)
+    // {
+    //     visited[i] = 0;
+    //     on_stack[i] = 0;
+    //     prev[i] = -1;
+    // }
+
+    // for (int u = 0; u < c.n; u++)
+    //     if (!visited[u])
+    //         lp_explore(c.W, E, c.n, visited, on_stack, prev, C, &n, u, 8);
+
+    // printf("%d\n", n);
+
+    glp_prob *lp = glp_create_prob();
+    // glp_smcp parm;
+    // parm.msg_lev = GLP_MSG_ON;
+    // parm.meth = GLP_PRIMAL;
+    // parm.pricing = GLP_PT_STD;
+    // parm.r_test = GLP_RT_HAR;
+    // parm.tol_bnd = 1e-7;
+    // parm.tol_dj = 1e-7;
+    // parm.tol_piv = 1e-10;
+    // parm.obj_ll = -__DBL_MAX__;
+    // parm.obj_ul = +__DBL_MAX__;
+    // parm.it_lim = __INT_MAX__;
+    // parm.tm_lim = __INT_MAX__;
+    // parm.out_frq = 200;
+    // parm.out_dly = 0;
+    // parm.presolve = GLP_ON;
+    int *ia = malloc(sizeof(int) * (ne + 1));
+    int *ja = malloc(sizeof(int) * (ne + 1));
+    double *ar = malloc(sizeof(double) * (ne + 1));
+
+    glp_set_obj_dir(lp, GLP_MAX);
+    glp_add_rows(lp, c.n * c.n);
+    for (int i = 0; i < c.n * c.n; i++)
+        glp_set_row_bnds(lp, i + 1, GLP_UP, 0.0, (*c.W)[i]);
+
+    glp_add_cols(lp, n);
+    int m = 0;
+
+    for (int i = 0; i < n; i++)
+    {
+        glp_set_col_bnds(lp, i + 1, GLP_LO, 0.0, 0.0);
+        glp_set_obj_coef(lp, i + 1, 1.0);
+
+        for (int j = 0; j < C[i].n; j++)
+        {
+            ia[m + 1] = C[i].e[j] + 1;
+            ja[m + 1] = i + 1;
+            ar[m + 1] = 1.0;
+            m++;
+        }
+    }
+
+    glp_load_matrix(lp, ne, ia, ja, ar);
+    glp_simplex(lp, NULL);
+    double z = glp_get_obj_val(lp);
+
+    printf("%lf\n", z);
+
+    glp_delete_prob(lp);
+    free(ia);
+    free(ja);
+    free(ar);
+    free(E);
+    free(_E);
+
+    free(C);
 }

@@ -190,7 +190,7 @@ void heuristics_greedy_cut(comp c)
     {
         for (int j = i + 1; j < c.n; j++)
         {
-            for (int k = i; k < j && k < i + 5; k++)
+            for (int k = i; k < j && k < i + 4; k++)
             {
                 int d = cut_matrix[i][j] - cut_matrix[i][k] - cut_matrix[k + 1][j];
                 if (d < 0)
@@ -199,7 +199,7 @@ void heuristics_greedy_cut(comp c)
                     heuristics_cut_matrix(cut_matrix, c);
                 }
             }
-            for (int k = j - 5; k < j && k >= i + 5; k++)
+            for (int k = j - 4; k < j && k >= i + 4; k++)
             {
                 int d = cut_matrix[i][j] - cut_matrix[i][k] - cut_matrix[k + 1][j];
                 if (d < 0)
