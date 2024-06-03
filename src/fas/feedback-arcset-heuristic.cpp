@@ -355,7 +355,7 @@ void base_heur_test(int seed, int n, int q){
 
     post = crossings_in_order(S, W, n);
 
-    std::cout << "post_heur: " << post << "\n";
+    std::cout << "post_heur: " << post << "    ";
     std::cout << "change: " << post-pre << "\n";
 
     free(W);
@@ -363,22 +363,9 @@ void base_heur_test(int seed, int n, int q){
 }
 
 void heur_test(){
-    /*
-    std::cout << "Expected: pre_heru: 39319    post_heur: 39308 \n";
-    base_heur_test(2, 94, 10);
-    std::cout << "Expected: pre_heru: 39408    post_heur: 39357 \n";
-    base_heur_test(3, 94, 10);
-    std::cout << "Expected: pre_heru: 39319    post_heur: 39297 \n";
-    base_heur_test(4, 94, 10);
-    std::cout << "Expected: pre_heru: 39436    post_heur: 39436 \n";
-    base_heur_test(5, 94, 10);
-    std::cout << "Expected: pre_heru: 39955    post_heur: 39916 \n";
-    base_heur_test(6, 94, 10);
-    std::cout << "Expected: pre_heru: 39322    post_heur: 39322 \n";
-    base_heur_test(7, 94, 10);
-    std::cout << "Expected: pre_heru: 39553    post_heur: 39553 \n";
-    */
+
     //base_heur_test(1, 12, 12);
+    std::cout << "Expected change: ";
     base_heur_test(1, 14, 12);
     //base_heur_test(8, 94, 10);
     
