@@ -56,7 +56,7 @@ void matrix_32_gen(unsigned int num_nodes, unsigned int (*matrix)[32][32], unsig
     };
 }
 
-void matrix_n_gen(unsigned int num_nodes, int **(*matrix), unsigned int seed){
+void matrix_n_gen(unsigned int num_nodes, int **&matrix, unsigned int seed){
     unsigned int rand_int;
     if(seed == 0){std::srand(time(NULL));}
     else {std::srand(seed);};
@@ -64,7 +64,7 @@ void matrix_n_gen(unsigned int num_nodes, int **(*matrix), unsigned int seed){
         for (int j = 0; j < num_nodes; j++){
             rand_int = 0 + std::rand() % 10;
             if (!(i == j)){
-                (*matrix)[i][j] = rand_int;
+                matrix[i][j] = rand_int;
             }
         };
     };
@@ -323,10 +323,9 @@ void heuristic_dp_ordering(int **W, int *S, int n, int q){
     };
 };
 
-void base_heur_test(int seed, int n, int q){
-    int **W;
-    int *S;
-    int pre, post;
+
+
+void heur_test_init(int seed, int n, int q, int **&W, int *&S){
 
     W = (int **)malloc(n * sizeof(int *));
     S = (int *)malloc(n * sizeof(int));
@@ -339,38 +338,42 @@ void base_heur_test(int seed, int n, int q){
             fprintf(stderr, "Memory allocation failed\n");
         }
     }
-   
-    /*
-     */
-    matrix_n_gen(n, &W, seed);
+    matrix_n_gen(n, W, seed);
 
     for (int i = 0; i < n; i++){ 
         S[i] = i;
     };
-    
-    pre = crossings_in_order(S, W, n);
-    std::cout << "pre_heru: " << pre << "    ";
-
-    heuristic_dp_ordering(W, S, n, q);
-
-    post = crossings_in_order(S, W, n);
-
-    std::cout << "post_heur: " << post << "    ";
-    std::cout << "change: " << post-pre << "\n";
-
-    free(W);
-    free(S);
 }
+int heur_feasibility_test(){
+    int accepted = 1;
+    int pre, post;
+    int **W;
+    int *S;
+    int q = 10;
+    for (int j = 1; j < 4; j++){ 
+        for (int i = 1; i < 100; i+=10){ 
+            heur_test_init(j, i, q, W, S);
+            pre = crossings_in_order(S, W, i);
+            heuristic_dp_ordering(W, S, i, q);
+            post = crossings_in_order(S, W, i);
+            if ( post - pre > 0 ){accepted = 0;};
+            std::sort( S, S + i );
+            for (int i = 0; i < i-1; i++){ 
+                if( S[i] == S[i+1] || S[i] > i){accepted = 0;};
+            };
+        };
+    };
+    return accepted;
+};
+
 
 void heur_test(){
-
-    //base_heur_test(1, 12, 12);
-    std::cout << "Expected change: ";
-    base_heur_test(1, 14, 12);
-    //base_heur_test(8, 94, 10);
-    
-    //base_heur_test(2, 18, 17);
-    //base_heur_test(2, 18, 18);
+    if ( heur_feasibility_test() == 1 ){
+        std::cout << "feasibility test: " << "PASSED" << "\n";
+    }
+    else{
+        std::cout << "feasibility test: " << "FAILED" << "\n";
+    };
 };
 
 /* 
