@@ -302,6 +302,7 @@ void heuristic_dp_ordering(int **W, int *S, int n, int q){
                 S_prime[i] = q_window[last_ordering[i]];
             };
             std::memcpy(S, S_prime, n * sizeof(int)); //Replace S by S'
+
             break; //Algorithm is now done
         };
 
@@ -310,7 +311,7 @@ void heuristic_dp_ordering(int **W, int *S, int n, int q){
         next_swap_idx = next_in_ordering(DP, Q, q);
         S_prime[remaining_nodes] = q_window[next_swap_idx];
 
-        q_window[next_swap_idx] = S[remaining_nodes - 1 - q];
+        q_window[next_swap_idx] = S[remaining_nodes - q];
         for (int i = 0; i < q; i++){ 
             Q[next_swap_idx][i] = W[q_window[next_swap_idx]][q_window[i]];
             Q[i][next_swap_idx] = W[q_window[i]][q_window[next_swap_idx]];
@@ -356,6 +357,9 @@ void base_heur_test(int seed, int n, int q){
 
     std::cout << "post_heur: " << post << "\n";
     std::cout << "change: " << post-pre << "\n";
+
+    free(W);
+    free(S);
 }
 
 void heur_test(){
@@ -374,7 +378,7 @@ void heur_test(){
     base_heur_test(7, 94, 10);
     std::cout << "Expected: pre_heru: 39553    post_heur: 39553 \n";
     */
-    base_heur_test(1, 12, 12);
+    //base_heur_test(1, 12, 12);
     base_heur_test(1, 14, 12);
     //base_heur_test(8, 94, 10);
     
