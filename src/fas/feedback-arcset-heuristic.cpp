@@ -131,28 +131,8 @@ unsigned long long choose(unsigned int n, unsigned int k){
  * @param node_count        - The total amount of nodes in the graph.
  * @param (*matrix)[32][32] - Pointer to the graph-matrix.
  */
-
-/*
-unsigned long long count_crossings(unsigned int k, unsigned long long nodes, int node_count,
-                             int (*matrix)[32][32]){
-
-    unsigned int count = 0;
-
-    for (unsigned int i = 0; i < node_count; i++){ 
-        if (nodes & (1 << i)){
-            if ( ((*matrix)[k][i]) > 0 ){// Checks wether any of the included nodes are in k's adj_list (adj_map)
-                count += ((*matrix)[k][i]);
-            };
-
-        };
-    };
-
-
-    return count;
-};
-*/
 unsigned long long count_crossings(int k, unsigned long long nodes, int node_count,
-                             std::vector<vector<int>> &matrix{
+                             std::vector<std::vector<int>> &matrix){
 
     unsigned int count = 0;
 
@@ -178,8 +158,8 @@ unsigned long long count_crossings(int k, unsigned long long nodes, int node_cou
  * @param (*matrix)[32][32] - pointer  to the graph-matrix
  */
 
-unsigned long long cum_crossings(unsigned long long curr_itt, unsigned int num_nodes, std::vector<unsigned long long> *DP,
-                                        int (*matrix)[32][32]){
+unsigned long long cum_crossings(unsigned long long curr_itt, unsigned int num_nodes, std::vector<unsigned long long> &DP,
+                                        std::vector<std::vector<int>> &matrix){
 
     int sum_initiallized = 0;
     unsigned long long curr_sum;
@@ -191,7 +171,7 @@ unsigned long long cum_crossings(unsigned long long curr_itt, unsigned int num_n
         if ( curr_itt & (1 << i) ){
             curr_perm = curr_itt;
             curr_perm = curr_perm ^ (unsigned long long) std::pow(2, i); // We exclude curr_node from curr_perm
-            curr_sum = (*DP)[curr_perm] + count_crossings(i, curr_perm, num_nodes, matrix);
+            curr_sum = DP[curr_perm] + count_crossings(i, curr_perm, num_nodes, matrix);
 
 
             if (sum_initiallized){// This is the DP recurrsion
@@ -208,7 +188,7 @@ unsigned long long cum_crossings(unsigned long long curr_itt, unsigned int num_n
 
 };
 
-int next_in_ordering(std::vector<unsigned long long> &DP, int &Q,
+int next_in_ordering(std::vector<unsigned long long> &DP, std::vector<std::vector<int>> &Q,
                                     int q){
     unsigned long long mask = (1<<q) - 1;
 
@@ -222,30 +202,6 @@ int next_in_ordering(std::vector<unsigned long long> &DP, int &Q,
     return -1; //Should never reach this stage
 
     };
-
-/*
-std::vector<unsigned int> final_ordering(std::vector<unsigned long long> *DP, int (*matrix)[32][32],
-                                    unsigned int num_nodes){
-    std::vector<unsigned int> ordering;
-    unsigned long long mask = (1<<num_nodes) - 1;
-
-    while (mask > 0){
-        for (int i = 0; i < num_nodes; i++){
-            if ((1 << i) & mask){
-
-
-                if ((*DP)[mask] == (*DP)[mask ^ (1 << i)] + count_crossings(i, (mask ^ (1 << i)), num_nodes, matrix)){
-                    mask -= (1 << i);
-                    ordering.push_back(i);
-                    break;
-                };
-            };
-        };
-    };
-    std::reverse(ordering.begin(), ordering.end());
-    return ordering;
-};
-*/
 
 std::vector<int> final_ordering(std::vector<unsigned long long> &DP, std::vector<std::vector<int>> &matrix,
                                     int num_nodes){
@@ -285,7 +241,7 @@ void write_results(unsigned int num_nodes, double time){
 int crossings_in_order(int *S, int **matrix, int num_nodes){
     int count = 0;
     for (int i = num_nodes-1; i >= 0; i--){ 
-        for (int j = num_nodes-1; j >= 0; j--){ 
+        for (int j = i - 1; j >= 0; j--){ 
             count += matrix[S[i]][S[j]]; //Crossings from last element to the next
         };
     };
@@ -299,52 +255,6 @@ int crossings_in_order(int *S, int **matrix, int num_nodes){
  *        q size of window.
  *
  */
-void heuristic_new_dp_ordering(int **W, int *S, int n, int q){
-    int remaining_nodes = n;
-    int *S_prime[n];
-    int q_window[std::min(n, q)];
-    int next_swap_idx;
-    std::vector<int> last_ordering;
-    std::vector<unsigned long long> DP(1<<(std::min(q, n)));
-    std::vector<std::vector<int>> Q(32, std::vector<int>(32, 0));
-
-    for (int i = n-1 ; i > n - std::min(n, q); i--){ 
-        q_window[std::min(n, q) - (n - i)] = S[i];
-        for (int j = n-1 ; j > n - std::min(n, q); j--){ 
-            Q[std::min(n, q) - (n - i)][std::min(n, q) - (n - j)] = W[S[i]][S[j]];
-        };
-    };
-
-    while(1){
-
-        DP[0] = 0;
-
-        for (unsigned int l = 1; l < (1<<std::min(q, remaining_nodes)); l++){
-            DP[l] = cum_crossings(l, std::min(q, remaining_nodes), &DP, &Q);
-        };
-
-
-        if (remaining_nodes <= q){
-            last_ordering = final_ordering(DP, matrix, remaining_nodes);
-            for(int i = 0; i < remaining_nodes; i++){
-                S_prime[i] = last_ordering[i];
-            };
-            std::memcpy(S, S_prime, int * sizeof(int)); //Replace S by S'
-            break; //Algorithm is now done
-        };
-
-        remaining_nodes -= 1;
-        next_swap_idx = next_in_ordering(DP, Q, q);
-        S_prime[remaining_nodes] = q_window[next_swap_idx];
-
-        q_window[next_swap_idx] = S[remaining_nodes - q];
-        for (int i = 0; i < q; i++){ 
-            Q[next_swap_idx][i] = W[q_window[next_swap_idx]][q_window[i]];
-            Q[i][next_swap_idx] = W[q_window[i]][q_window[next_swap_idx]];
-        };
-
-
-};
 void heuristic_dp_ordering(int **W, int *S, int n, int q){
     /* ALGORITHM:
      * 1. select last q nodes of S, save in qxq-matrix Q.
@@ -362,92 +272,60 @@ void heuristic_dp_ordering(int **W, int *S, int n, int q){
      * NOTES:
      * - Currently assuming matrix Q max size is 32x32
      */
+    int remaining_nodes = n;
     int S_prime[n];
-    std::vector<std::vector<int>> Q;
-    int map_win_to_w[q]; //Keeps track of node-index corresponding to position in W.
-    int window[q];
-    int s_old;
-    int s_new;
-    int itteration = 0;
-    int count = 0;
-    std::vector<unsigned int> f_ord;
-    std::vector<unsigned long long> DP(1<<q);
+    int q_window[std::min(n, q)];
+    int next_swap_idx;
+    std::vector<int> last_ordering;
+    std::vector<unsigned long long> DP(1<<(std::min(q, n)));
+    std::vector<std::vector<int>> Q(32, std::vector<int>(32, 0));
 
-    for (int i = 0; i < q; i++){ 
-        map_win_to_w[i] = S[i];
-        window[i] = S[i];
-        for (int j = 0; j < q; j++){ //Is this correct????
-            Q[i][j] = W[S[i]][S[j]];
+    for (int i = n-1 ; i >= n - std::min(n, q); i--){ 
+        q_window[std::min(n, q) - (n - i)] = S[i];
+        for (int j = n-1 ; j >= n - std::min(n, q); j--){ 
+            Q[std::min(n, q) - (n - i)][std::min(n, q) - (n - j)] = W[S[i]][S[j]];
         };
     };
-    std::cout << "HERE" << "\n";
 
-    
     while(1){
 
-        //std::cout << "itteration: " << itteration << " \n";
         DP[0] = 0;
 
-
-        //std::cout << "C_1 \n";
-
-        for (unsigned int l = 1; l < (1<<q); l++){
-            DP[l] = cum_crossings(l, q, &DP, &Q);
+        for (unsigned int l = 1; l < (1<<std::min(q, remaining_nodes)); l++){
+            DP[l] = cum_crossings(l, std::min(q, remaining_nodes), DP, Q);
         };
 
-        
-        //std::cout << "C_2 \n";
-        if (n-itteration <= q){
-            for (unsigned int i = 0; i < q; i++){ 
-                std::cout << i << " " << map_win_to_w[i] << "\n";
+
+        if (remaining_nodes <= q){
+            last_ordering = final_ordering(DP, Q, remaining_nodes);
+            for(int i = 0; i < remaining_nodes; i++){
+                S_prime[i] = q_window[last_ordering[i]];
             };
-            // NEED TO USE FINAL ORDERING AND ADD TO S_PRIME!!!
-            for (int elem : final_ordering(&DP, &Q, q)){ 
-                std::cout << elem << " " << map_win_to_w[elem] << "\n";
-                S_prime[(n-2) - itteration + q - count] = map_win_to_w[elem];
-                count += 1;
-            };
-            break;
+            std::memcpy(S, S_prime, n * sizeof(int)); //Replace S by S'
+            break; //Algorithm is now done
         };
 
-        s_old = next_in_ordering(&DP, &Q, q);
 
-        S_prime[(n-1) - itteration] = map_win_to_w[s_old];
+        remaining_nodes -= 1;
+        next_swap_idx = next_in_ordering(DP, Q, q);
+        S_prime[remaining_nodes] = q_window[next_swap_idx];
 
-        //std::cout << "C_3 \n";
-        
-
-
-
-        s_new = S[q + itteration];
-        window[s_old] = s_new;
-        map_win_to_w[s_old] = s_new;
-
-        //std::cout << "C_4 \n";
+        q_window[next_swap_idx] = S[remaining_nodes - 1 - q];
         for (int i = 0; i < q; i++){ 
-            if(s_old != 0){
-            //std::cout << "i: " << i << " s_old: " << s_old << "\n";
-            //std::cout << "s_new: " << s_new << " map_win_to_w[i]: " << map_win_to_w[i] << "\n";
-            }
-            Q[s_old][i] = W[s_new][map_win_to_w[i]];    
-            Q[i][s_old] = W[map_win_to_w[i]][s_new];    
+            Q[next_swap_idx][i] = W[q_window[next_swap_idx]][q_window[i]];
+            Q[i][next_swap_idx] = W[q_window[i]][q_window[next_swap_idx]];
         };
-        itteration += 1;
 
 
-    }
-    //std::cout << "Done" << "\n";
 
-    // NEED TO COUNT HOW MANY LESS/MORE CROSSINGS WE NOW HAVE!
-    if (crossings_in_order(S_prime, W, n) < crossings_in_order(S, W, n)){
-        std::memcpy(S, S_prime, int * sizeof(int)); //Replace S by S'
+
     };
-
 };
 
 void base_heur_test(int seed, int n, int q){
     int **W;
     int *S;
+    int pre, post;
 
     W = (int **)malloc(n * sizeof(int *));
     S = (int *)malloc(n * sizeof(int));
@@ -468,9 +346,16 @@ void base_heur_test(int seed, int n, int q){
     for (int i = 0; i < n; i++){ 
         S[i] = i;
     };
-    std::cout << "pre_heru: " << crossings_in_order(S, W, n) << "    ";
+    
+    pre = crossings_in_order(S, W, n);
+    std::cout << "pre_heru: " << pre << "    ";
+
     heuristic_dp_ordering(W, S, n, q);
-    std::cout << "post_heur: " << crossings_in_order(S, W, n) << "\n";
+
+    post = crossings_in_order(S, W, n);
+
+    std::cout << "post_heur: " << post << "\n";
+    std::cout << "change: " << post-pre << "\n";
 }
 
 void heur_test(){
@@ -489,17 +374,19 @@ void heur_test(){
     base_heur_test(7, 94, 10);
     std::cout << "Expected: pre_heru: 39553    post_heur: 39553 \n";
     */
-    base_heur_test(8, 94, 10);
+    base_heur_test(1, 12, 12);
+    base_heur_test(1, 14, 12);
+    //base_heur_test(8, 94, 10);
     
     //base_heur_test(2, 18, 17);
-    base_heur_test(2, 18, 18);
+    //base_heur_test(2, 18, 18);
 };
 
 /* 
  * Finds the minimum feedback vertex set size
  */
 int main(int argc, char * argv[]){
-
+    std::cout << "Started main\n";
     heur_test();
 
 
