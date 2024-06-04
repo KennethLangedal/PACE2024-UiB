@@ -7,11 +7,11 @@
 #include<unordered_map>
 #include<bitset>
 #include<cstdlib>
-#include<time.h>
 #include<fstream>
 #include<chrono>
 #include<cstdlib>
 #include<cstring>
+#include<chrono>
 
 /** 
  * @file  feedback-arcset-dp.cpp
@@ -160,7 +160,7 @@ void heuristic_dp_ordering(int **W, int *S, int n, int q){
     int remaining_nodes = n;
     int S_prime[n];
     int q_window[std::min(n, q)];
-    int next_swap_idx;
+    int next_swap_idx = -1;
     std::vector<int> last_ordering;
     std::vector<unsigned long long> DP(1<<(std::min(q, n)));
     std::vector<std::vector<int>> Q(32, std::vector<int>(32, 0));
@@ -176,10 +176,13 @@ void heuristic_dp_ordering(int **W, int *S, int n, int q){
 
         DP[0] = 0;
 
+        /* Need only calculate DP of l where l includes the position with the changed node
+         */
         for (unsigned int l = 1; l < (1<<std::min(q, remaining_nodes)); l++){
-            DP[l] = cum_crossings(l, std::min(q, remaining_nodes), DP, Q);
+            if (next_swap_idx == -1 || l & (1<<next_swap_idx)){
+                DP[l] = cum_crossings(l, std::min(q, remaining_nodes), DP, Q);
+            }
         };
-
 
         if (remaining_nodes <= q){
             last_ordering = final_ordering(DP, Q, remaining_nodes);
@@ -190,7 +193,6 @@ void heuristic_dp_ordering(int **W, int *S, int n, int q){
 
             break; //Algorithm is now done
         };
-
 
         remaining_nodes -= 1;
         next_swap_idx = next_in_ordering(DP, Q, q);
@@ -246,6 +248,24 @@ int heur_feasibility_test(){
     };
     return accepted;
 };
+void heur_example_print(int q, int n, int seed, int rounds, int print_rounds){
+    int pre, post;
+    int **W;
+    int *S;
+    std::chrono::duration<double> duration;
+    heur_test_init(seed, n, q, W, S);
+    std::cout << "\nEXAMPLE START: q = " << q << ", n = " << n << ", seed = " << seed << ", rounds = " << rounds << "\n";
+    pre = crossings_in_order(S, W, n);
+    for (int i = 0; i < rounds; i++){ 
+        auto start = std::chrono::steady_clock::now();
+        heuristic_dp_ordering(W, S, n, q);
+        auto end = std::chrono::steady_clock::now();
+        duration += end-start;
+        post = crossings_in_order(S, W, n);
+        if (print_rounds) std::cout << "round " << i << ":\n" << "   pre: " << pre << "  post: " << post << "  change: " << post - pre << "\n";
+    };
+    std::cout << "RESULT:\n pre: " << pre << ", post: " << post << ",  change: " << post - pre << ", time: " << duration.count() << "\n";
+};
 
 
 void heur_test(){
@@ -263,4 +283,8 @@ void heur_test(){
 int main(int argc, char * argv[]){
     std::cout << "Started main\n";
     heur_test();
+    heur_example_print(8, 1000, 1, 34, 1);
+    heur_example_print(9, 1000, 1, 17, 0);
+    heur_example_print(10, 1000, 1, 18, 0);
+    heur_example_print(11, 1000, 1, 15, 0);
 };
