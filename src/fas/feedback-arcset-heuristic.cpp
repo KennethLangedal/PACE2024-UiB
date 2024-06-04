@@ -2,16 +2,9 @@
 #include<algorithm>
 #include<math.h>
 #include<vector>
-#include<list>
-#include<tuple>
-#include<unordered_map>
-#include<bitset>
 #include<cstdlib>
-#include<fstream>
 #include<chrono>
-#include<cstdlib>
 #include<cstring>
-#include<chrono>
 
 /** 
  * @file  feedback-arcset-dp.cpp
@@ -25,6 +18,12 @@
 // Helper functions
 //
 
+/* Generates random edge-weights for the given matrix
+ *
+ * @param num_nodes     - Amount of nodes the matrix should contain
+ * @param matrix        - Pointer to the matrix
+ * @param seed          - Seed for RNG
+ */
 void matrix_n_gen(unsigned int num_nodes, int **&matrix, unsigned int seed){
     unsigned int rand_int;
     if(seed == 0){std::srand(time(NULL));}
@@ -50,7 +49,7 @@ void matrix_n_gen(unsigned int num_nodes, int **&matrix, unsigned int seed){
  * @param k                 - The index of the current node we want to add.
  * @param nodes             - Binary encoding of the included nodes we want to compare with.
  * @param node_count        - The total amount of nodes in the graph.
- * @param (*matrix)[32][32] - Pointer to the graph-matrix.
+ * @param matrix            - The graphs-matrix.
  */
 unsigned long long count_crossings(int k, unsigned long long nodes, int node_count,
                              std::vector<std::vector<int>> &matrix){
@@ -73,10 +72,9 @@ unsigned long long count_crossings(int k, unsigned long long nodes, int node_cou
  *
  * @param curr_itt          - Encoding of the included nodes to itterate over
  * @param num_nodes         - Amount of nodes in the graph
- * @param *DP               - Pointer to the DP-table
- * @param (*matrix)[32][32] - pointer  to the graph-matrix
+ * @param DP                - Reference to the DP-table
+ * @param matrix - Reference to the graph-matrix
  */
-
 unsigned long long cum_crossings(unsigned long long curr_itt, unsigned int num_nodes, std::vector<unsigned long long> &DP,
                                         std::vector<std::vector<int>> &matrix){
 
@@ -104,6 +102,12 @@ unsigned long long cum_crossings(unsigned long long curr_itt, unsigned int num_n
     return result;
 };
 
+/* Calculates which node should be put next in the ordering
+ *
+ * @param DP        - Reference to the DP-table
+ * @param Q         - Reference to the Q-matrix
+ * @param q         - Size of Q-matrix
+ */
 int next_in_ordering(std::vector<unsigned long long> &DP, std::vector<std::vector<int>> &Q,
                                     int q){
     unsigned long long mask = (1<<q) - 1;
@@ -117,6 +121,12 @@ int next_in_ordering(std::vector<unsigned long long> &DP, std::vector<std::vecto
     return -1; //Should never reach this stage
 };
 
+/* Calculates the full ordering of nodes in the DAG, giving least amount of back-cycles.
+ *
+ * @param DP            - Reference to the DP-table
+ * @param matrix        - Reference to the graph-matrix
+ * @param num_nodes     - The number of nodes in the graph
+ */
 std::vector<int> final_ordering(std::vector<unsigned long long> &DP, std::vector<std::vector<int>> &matrix,
                                     int num_nodes){
     std::vector<int> ordering;
@@ -139,6 +149,12 @@ std::vector<int> final_ordering(std::vector<unsigned long long> &DP, std::vector
     return ordering;
 };
 
+/* Calculates the amount of back-edges in a given DAG-order
+ *
+ * @param S             - The ordering of the DAG
+ * @param matrix        - The input graph-matrix
+ * @param num_nodes     - Amount of included nodes
+ */
 int crossings_in_order(int *S, int **matrix, int num_nodes){
     int count = 0;
     for (int i = num_nodes-1; i >= 0; i--){ 
@@ -149,12 +165,13 @@ int crossings_in_order(int *S, int **matrix, int num_nodes){
     return count;
 };
 
-
-/* Input: **W matrix of input graph
- *        *S Initial ordering of nodes.
- *        n amount of nodes.
- *        q size of window.
+/* A heuristic for the fas, calculating the optimal ordering for nodes inside the sliding window, independantly 
+ * from those outside the window. window starts at the rightmost position of S, until start of S.
  *
+ * @param W             - Complete graph-matrix
+ * @param S             - Original ordering
+ * @param n             - Number of total nodes
+ * @param q             - Size of the sliding window
  */
 void heuristic_dp_ordering(int **W, int *S, int n, int q){
     int remaining_nodes = n;
@@ -207,8 +224,14 @@ void heuristic_dp_ordering(int **W, int *S, int n, int q){
 };
 
 
-
-void heur_test_init(int seed, int n, int q, int **&W, int *&S){
+/* Method to initiallize an input matrix W of size n, with an original ordering S. 
+ *
+ * @param seed          - Seed to the RNG
+ * @param n             - Amount of total nodes
+ * @param W             - Reference to total graph-matrix
+ * @param S             - Reference to ordering of nodes
+ */
+void heur_test_init(int seed, int n, int **&W, int *&S){
 
     W = (int **)malloc(n * sizeof(int *));
     S = (int *)malloc(n * sizeof(int));
@@ -227,6 +250,11 @@ void heur_test_init(int seed, int n, int q, int **&W, int *&S){
         S[i] = i;
     };
 }
+
+/* Tests some different randomly generated matrixes, of different sizes and different 
+ * graph-sizes. Returns 1 if the new ordering is feasible, and does not give a worse ordering.
+ *
+ */
 int heur_feasibility_test(){
     int accepted = 1;
     int pre, post;
@@ -235,7 +263,7 @@ int heur_feasibility_test(){
     int q = 10;
     for (int j = 1; j < 4; j++){ 
         for (int i = 1; i < 100; i+=10){ 
-            heur_test_init(j, i, q, W, S);
+            heur_test_init(j, i, W, S);
             pre = crossings_in_order(S, W, i);
             heuristic_dp_ordering(W, S, i, q);
             post = crossings_in_order(S, W, i);
@@ -248,12 +276,22 @@ int heur_feasibility_test(){
     };
     return accepted;
 };
+
+/* Creates a random matrix of size n, with an ordering S. It runs our heuristic on these 
+ * for 'rounds' rounds, and prints the change in performance of new ordering, with time spent. 
+ *
+ * @param q             - Window size
+ * @param n             - Size of graph-matrix
+ * @param seed          - Seed of RNG
+ * @param rounds        - Amount of times to run the heuristic on the graph
+ * @param print_rounds  - 1 to print change after each round, 0 to only print final result.
+ */
 void heur_example_print(int q, int n, int seed, int rounds, int print_rounds){
     int pre, post;
     int **W;
     int *S;
     std::chrono::duration<double> duration;
-    heur_test_init(seed, n, q, W, S);
+    heur_test_init(seed, n, W, S);
     std::cout << "\nEXAMPLE START: q = " << q << ", n = " << n << ", seed = " << seed << ", rounds = " << rounds << "\n";
     pre = crossings_in_order(S, W, n);
     for (int i = 0; i < rounds; i++){ 
@@ -268,6 +306,8 @@ void heur_example_print(int q, int n, int seed, int rounds, int print_rounds){
 };
 
 
+/* Checks if our tests pass
+ */
 void heur_test(){
     if ( heur_feasibility_test() == 1 ){
         std::cout << "feasibility test: " << "PASSED" << "\n";
