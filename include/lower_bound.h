@@ -8,3 +8,5 @@ int lower_bound_flow_check(comp c);
 int lower_bound_cycle_packing(comp c);
 
 void lower_bound_cycle_packing_lp(comp c);
+
+void lower_bound_cycle_packing_lp_clp(comp c);

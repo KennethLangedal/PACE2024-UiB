@@ -328,80 +328,51 @@ void lower_bound_cycle_packing_lp(comp c)
     int ne = 0;
     cycle *C = malloc(sizeof(cycle) * max_c);
 
-    int *_E = malloc(sizeof(int) * c.n * c.n);
-    int **E = malloc(sizeof(int *) * c.n);
-    for (int i = 0; i < c.n; i++)
-        E[i] = _E + i * c.n;
-
-    for (int i = 0; i < c.n * c.n; i++)
-        _E[i] = 0;
-
     for (int u = 0; u < c.n; u++)
     {
         for (int v = u + 1; v < c.n; v++)
         {
-            if (c.W[u][v] == 0)
-                continue;
+            C[n++] = (cycle){.n = 2, .e = {u * c.n + v, v * c.n + u}};
+            ne += 2;
+            // if (c.W[u][v] == 0)
+            //     continue;
 
             for (int w = u + 1; w < c.n; w++)
             {
-                if (c.W[v][w] == 0)
+                if (w == v)
                     continue;
+                // if (c.W[v][w] == 0)
+                //     continue;
 
-                if (c.W[w][u] > 0)
-                {
-                    if (E[u][v] < MC * c.W[u][v] && E[v][w] < MC * c.W[v][w] && MC * E[w][u] < MC * c.W[w][u])
-                    {
-                        E[u][v]++;
-                        E[v][w]++;
-                        E[w][u]++;
-                        int e1 = u * c.n + v, e2 = v * c.n + w, e3 = w * c.n + u;
-                        C[n++] = (cycle){.n = 3, .e = {e1, e2, e3}};
-                        // set_weight(*c.W, &C[n - 1]);
-                        ne += 3;
-                    }
-                }
+                // if (c.W[w][u] > 0)
+                // {
+                C[n++] = (cycle){.n = 3, .e = {u * c.n + v, v * c.n + w, w * c.n + u}};
+                ne += 3;
+                // }
 
-                for (int x = u + 1; x < c.n; x++)
-                {
-                    if (c.W[w][x] == 0)
-                        continue;
+                // for (int x = u + 1; x < c.n; x++)
+                // {
+                //     if (c.W[w][x] == 0)
+                //         continue;
 
-                    if (c.W[x][u] > 0)
-                    {
-                        if (E[u][v] < MC * c.W[u][v] && E[v][w] < MC * c.W[v][w] && E[w][x] < MC * c.W[w][x] && E[x][u] < MC * c.W[x][u])
-                        {
-                            E[u][v]++;
-                            E[v][w]++;
-                            E[w][x]++;
-                            E[x][u]++;
-                            C[n++] = (cycle){.n = 4, .e = {u * c.n + v, v * c.n + w, w * c.n + x, x * c.n + u}};
-                            // set_weight(*c.W, &C[n - 1]);
-                            ne += 4;
-                        }
-                    }
+                //     if (c.W[x][u] > 0)
+                //     {
+                //         C[n++] = (cycle){.n = 4, .e = {u * c.n + v, v * c.n + w, w * c.n + x, x * c.n + u}};
+                //         ne += 4;
+                //     }
 
-                    for (int y = u + 1; y < c.n; y++)
-                    {
-                        if (c.W[x][y] == 0)
-                            continue;
+                //     for (int y = u + 1; y < c.n; y++)
+                //     {
+                //         if (c.W[x][y] == 0)
+                //             continue;
 
-                        if (c.W[y][u] > 0)
-                        {
-                            if (E[u][v] < MC * c.W[u][v] && E[v][w] < MC * c.W[v][w] && E[w][x] < MC * c.W[w][x] && E[x][y] < MC * c.W[x][y] && E[y][u] < MC * c.W[y][u])
-                            {
-                                E[u][v]++;
-                                E[v][w]++;
-                                E[w][x]++;
-                                E[x][y]++;
-                                E[y][u]++;
-                                C[n++] = (cycle){.n = 5, .e = {u * c.n + v, v * c.n + w, w * c.n + x, x * c.n + y, y * c.n + u}};
-                                // set_weight(*c.W, &C[n - 1]);
-                                ne += 5;
-                            }
-                        }
-                    }
-                }
+                //         if (c.W[y][u] > 0)
+                //         {
+                //             C[n++] = (cycle){.n = 5, .e = {u * c.n + v, v * c.n + w, w * c.n + x, x * c.n + y, y * c.n + u}};
+                //             ne += 5;
+                //         }
+                //     }
+                // }
             }
         }
     }
@@ -444,29 +415,38 @@ void lower_bound_cycle_packing_lp(comp c)
     int *ja = malloc(sizeof(int) * (ne + 1));
     double *ar = malloc(sizeof(double) * (ne + 1));
 
-    glp_set_obj_dir(lp, GLP_MAX);
-    glp_add_rows(lp, c.n * c.n);
+    glp_set_obj_dir(lp, GLP_MIN);
+    glp_add_cols(lp, c.n * c.n);
     for (int i = 0; i < c.n * c.n; i++)
-        glp_set_row_bnds(lp, i + 1, GLP_UP, 0.0, (*c.W)[i]);
-
-    glp_add_cols(lp, n);
-    int m = 0;
-
-    for (int i = 0; i < n; i++)
     {
         glp_set_col_bnds(lp, i + 1, GLP_LO, 0.0, 0.0);
-        glp_set_obj_coef(lp, i + 1, 1.0);
+        glp_set_obj_coef(lp, i + 1, (*c.W)[i]);
+        // glp_set_row_bnds(lp, i + 1, GLP_UP, 0.0, (*c.W)[i]);
+    }
+
+    glp_add_rows(lp, n);
+    int m = 0;
+    for (int i = 0; i < n; i++)
+    {
+        if (C[i].n == 3)
+            glp_set_row_bnds(lp, i + 1, GLP_LO, 1.0, 0.0);
+        else if (C[i].n == 2)
+            glp_set_row_bnds(lp, i + 1, GLP_FX, 1.0, 1.0);
+        // glp_set_col_bnds(lp, i + 1, GLP_LO, 0.0, 0.0);
+        // glp_set_obj_coef(lp, i + 1, 1.0);
 
         for (int j = 0; j < C[i].n; j++)
         {
-            ia[m + 1] = C[i].e[j] + 1;
-            ja[m + 1] = i + 1;
+            ia[m + 1] = i + 1;
+            ja[m + 1] = C[i].e[j] + 1;
             ar[m + 1] = 1.0;
             m++;
         }
     }
 
     glp_load_matrix(lp, ne, ia, ja, ar);
+    // glp_interior(lp, NULL);
+
     glp_simplex(lp, NULL);
     double z = glp_get_obj_val(lp);
 
@@ -476,8 +456,8 @@ void lower_bound_cycle_packing_lp(comp c)
     free(ia);
     free(ja);
     free(ar);
-    free(E);
-    free(_E);
+    // free(E);
+    // free(_E);
 
     free(C);
 }

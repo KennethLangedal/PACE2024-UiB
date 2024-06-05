@@ -172,7 +172,7 @@ void heuristics_swap_cut(comp c, int l, int k, int r, int *tmp, int change)
         c.S[l + (r - k) + i] = tmp[i];
 }
 
-void heuristics_greedy_cut(comp c)
+void heuristics_greedy_cut(comp c, volatile sig_atomic_t *tle)
 {
     int *tmp = malloc(sizeof(int) * c.n);
 
@@ -186,7 +186,7 @@ void heuristics_greedy_cut(comp c)
 
     heuristics_cut_matrix(cut_matrix, c);
 
-    for (int i = 0; i < c.n; i++)
+    for (int i = 0; i < c.n && !(*tle); i++)
     {
         for (int j = i + 1; j < c.n; j++)
         {

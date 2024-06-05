@@ -1,109 +1,120 @@
 #include "ocm.h"
 #include "dfas.h"
-#include "heuristics.h"
 #include "tiny_solver.h"
 #include "lower_bound.h"
+#include "heuristics.h"
 
 #include <stdio.h>
+#include <unistd.h>
+#include <string.h>
 #include <stdlib.h>
+
+volatile sig_atomic_t tle = 0;
+
+void term(int signum)
+{
+    tle = 1;
+}
 
 int main(int argc, char **argv)
 {
-    FILE *f = fopen(argv[1], "r");
-    ocm p = ocm_parse(f);
-    fclose(f);
+    struct sigaction action;
+    memset(&action, 0, sizeof(struct sigaction));
+    action.sa_handler = term;
+    sigaction(SIGTERM, &action, NULL);
 
+    ocm p = ocm_parse(stdin);
     dfas g = dfas_construct(p);
-    if (g.n < 0)
+    int valid = g.n > 0;
+    for (int i = 0; i < g.n; i++)
+        if (g.C[i].n < 0)
+            valid = 0;
+
+    if (!valid)
     {
-        fprintf(stderr, "%s, failed\n", argv[1]);
-        f = fopen(argv[2], "w");
+        // TODO, add simple heuristic
+        // fprintf(stderr, "%s, failed\n", argv[1]);
         for (int i = 0; i < p.n1; i++)
-            fprintf(f, "%d\n", p.n0 + i + 1);
-        fclose(f);
+            fprintf(stdout, "%d\n", i + 1 + p.n0);
+        ocm_free(p);
+        dfas_free(g);
+        return 0;
     }
 
-    int max_c = 0;
-    for (int i = 0; i < g.n; i++)
-        if (g.C[i].n > max_c)
-            max_c = g.C[i].n;
-
     int solved = 1, cost = 0;
+    int *_S = malloc(sizeof(int) * p.n1);
+    int **S = malloc(sizeof(int *) * (g.n + 1));
+    int *B = malloc(sizeof(int) * g.n);
+
+    int m = 0;
+    int *P = malloc(sizeof(int) * g.n);
+
+    S[0] = _S;
     for (int i = 0; i < g.n; i++)
     {
         comp c = g.C[i];
+        S[i + 1] = S[i] + c.n;
         if (c.n > 1 && c.n <= 20)
             tiny_solver_solve(c);
         else if (c.n > 20)
         {
-            solved = 0;
-
-            int *best = malloc(sizeof(int) * c.n);
+            P[m++] = i;
+            B[i] = *c.c;
             for (int j = 0; j < c.n; j++)
-                best[j] = c.S[j];
-            int best_cost = *c.c;
-
-            for (int t = 0; t < 50; t++)
-            {
-                heuristic_randomize_solution(c, (rand() % 4) + 1);
-                heuristics_greedy_improvement(c);
-                tiny_solver_sliding_solve(c, 8);
-
-                int old_c = *c.c + 1;
-                while (old_c > *c.c)
-                {
-                    old_c = *c.c;
-                    heuristics_greedy_cut(c);
-                }
-
-                if (*c.c < best_cost)
-                {
-                    for (int j = 0; j < c.n; j++)
-                        best[j] = c.S[j];
-                    best_cost = *c.c;
-                    printf("%d %d\n", t, *c.c);
-                }
-                else if (*c.c > best_cost)
-                {
-                    *c.c = best_cost;
-                    for (int j = 0; j < c.n; j++)
-                        c.S[j] = best[j];
-                }
-            }
-
-            // f = fopen("g.csv", "w");
-            // fprintf(f, "source;target;weight;broken\n");
-            // for (int j = 0; j < c.n; j++)
-            // {
-            //     int u = c.S[j];
-            //     for (int k = j + 1; k < c.n; k++)
-            //     {
-            //         int v = c.S[k];
-            //         if (c.W[u][v] > 0)
-            //             fprintf(f, "%d;%d;%d;%d\n", u, v, c.W[u][v], 0);
-            //         else if (c.W[v][u] > 0)
-            //             fprintf(f, "%d;%d;%d;%d\n", v, u, c.W[v][u], 1);
-            //     }
-            // }
-            // fclose(f);
-
-            printf("%d\n", lower_bound_greedy(c));
+                S[i][j] = c.S[j];
         }
-
         cost += *c.c;
     }
+    // fprintf(stderr, "%d %d\n", cost + g.offset, m);
 
-    // fprintf(stderr, "%d\n", g.offset);
-    int *S = dfas_get_solution(p, g);
-    f = fopen(argv[2], "w");
+    int t = 0;
+    while (!tle)
+    {
+        for (int _i = 0; _i < m; _i++)
+        {
+            int i = P[_i];
+            comp c = g.C[i];
+
+            heuristic_randomize_solution(c, (rand() % 2) + 1);
+            heuristics_greedy_improvement(c);
+            tiny_solver_sliding_solve(c, 8);
+
+            int old_c = *c.c + 1;
+            while (old_c > *c.c && !tle && *c.c < B[i] + 20)
+            {
+                old_c = *c.c;
+                heuristics_greedy_cut(c, &tle);
+            }
+
+            if (*c.c < B[i])
+            {
+                for (int j = 0; j < c.n; j++)
+                    S[i][j] = c.S[j];
+
+                cost -= B[i];
+                B[i] = *c.c;
+                cost += B[i];
+            }
+            else if (*c.c > B[i])
+            {
+                *c.c = B[i];
+                for (int j = 0; j < c.n; j++)
+                    c.S[j] = S[i][j];
+            }
+        }
+        // fprintf(stderr, "%d %d\n", cost + g.offset, t++);
+    }
+
+    int *R = dfas_get_solution(p, g);
     for (int i = 0; i < p.n1; i++)
-        fprintf(f, "%d\n", p.n0 + S[i] + 1);
-    fclose(f);
-    free(S);
-
-    fprintf(stderr, "%s, opt=%d, num_c=%d, max_c=%d, solution=%d\n", argv[1], solved, g.n, max_c, g.offset + cost);
+        fprintf(stdout, "%d\n", p.n0 + R[i] + 1);
 
     ocm_free(p);
     dfas_free(g);
+    free(_S);
+    free(S);
+    free(B);
+    free(P);
+    free(R);
     return 0;
 }

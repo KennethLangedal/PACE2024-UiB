@@ -3,4 +3,6 @@
 
 int solve(comp c);
 
+int solve_dual(comp c);
+
 int solve_lazy(comp c);
