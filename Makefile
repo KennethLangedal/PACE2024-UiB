@@ -21,8 +21,8 @@ all : exact heuristic
 -include $(DEP:.o=.d)
 
 exact : $(OBJ_EXACT)
-	g++ $(CFLAGS) -o $@ $^ bin/libipamirEvalMaxSAT2022.a -lm -lz -lgmp
-#	g++ $(CFLAGS) -o $@ $^ bin/libuwrmaxsat.a bin/libcominisatps.a bin/libmaxpre.a -lm -lz -lgmp
+#	g++ $(CFLAGS) -o $@ $^ bin/libipamirEvalMaxSAT2022.a -lm -lz -lgmp
+	g++ $(CFLAGS) -o $@ $^ bin/libuwrmaxsat.a bin/libcominisatps.a bin/libmaxpre.a -lm -lz -lgmp
 
 heuristic : $(OBJ_HEURISTIC)
 	$(CC) $(CFLAGS) -o $@ $^ -lm

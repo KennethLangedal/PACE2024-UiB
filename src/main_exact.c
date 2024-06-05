@@ -41,7 +41,7 @@ int main(int argc, char **argv)
                     best[j] = c.S[j];
                 int best_cost = *c.c;
 
-                for (int t = 0; t < 20; t++)
+                for (int t = 0; t < 200; t++)
                 {
                     heuristic_randomize_solution(c, (rand() % 4) + 1);
                     heuristics_greedy_improvement(c);
@@ -72,16 +72,16 @@ int main(int argc, char **argv)
 
                 fprintf(stderr, "%d %d\n", c.n, *c.c);
 
-                packing p = cycle_packing_init(c);
-                cycle_packing_greedy(p);
-                fprintf(stderr, "%d %d\n", *c.c, *p.c);
-                cycle_packing_free(p);
-                solved = 0;
-                
-                // if (!solve_lazy(c))
-                // {
-                //     solved = 0;
-                // }
+                // packing p = cycle_packing_init(c);
+                // cycle_packing_greedy(p);
+                // fprintf(stderr, "%d %d\n", *c.c, *p.c);
+                // cycle_packing_free(p);
+                // solved = 0;
+
+                if (!solve_lazy(c))
+                {
+                    solved = 0;
+                }
             }
             cost += *c.c;
         }

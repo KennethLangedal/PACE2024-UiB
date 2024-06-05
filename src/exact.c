@@ -156,10 +156,10 @@ int solve_dual(comp c)
         }
     }
 
-    // fprintf(stderr, "Solving %d hard\n", C);
+    fprintf(stderr, "Solving %d hard\n", C);
     ipamir_solve(solver);
 
-    // fprintf(stderr, "Solved %d vs %d\n", *c.c, (int)ipamir_val_obj(solver));
+    fprintf(stderr, "Solved %d vs %d\n", *c.c, (int)ipamir_val_obj(solver));
     int res = *c.c == (int)ipamir_val_obj(solver);
 
     ipamir_release(solver);
@@ -271,12 +271,12 @@ void lazy_cycle_packing(void *solver, int **D, int n, int *visited, int *on_stac
             {
                 if (w != v && D[u][v] > 0 && D[v][w] > 0 && D[w][u] > 0)
                 {
-                    int min = D[u][v] < D[v][w] ? D[u][v] : D[v][w];
-                    min = min < D[w][u] ? min : D[w][u];
-                    D[u][v] -= min;
-                    D[v][w] -= min;
-                    D[w][u] -= min;
-                    *lb += min;
+                    // int min = D[u][v] < D[v][w] ? D[u][v] : D[v][w];
+                    // min = min < D[w][u] ? min : D[w][u];
+                    // D[u][v] -= min;
+                    // D[v][w] -= min;
+                    // D[w][u] -= min;
+                    // *lb += min;
                     ipamir_add_hard(solver, u * n + v);
                     ipamir_add_hard(solver, v * n + w);
                     ipamir_add_hard(solver, w * n + u);
@@ -300,9 +300,10 @@ void lazy_cycle_packing(void *solver, int **D, int n, int *visited, int *on_stac
                 {
                     if (x != v && x != w && D[u][v] > 0 && D[v][w] > 0 && D[w][x] > 0 && D[x][u] > 0)
                     {
-                        int min = D[u][v] < D[v][w] ? D[u][v] : D[v][w];
-                        min = min < D[w][x] ? min : D[w][x];
-                        min = min < D[x][u] ? min : D[x][u];
+                        // int min = D[u][v] < D[v][w] ? D[u][v] : D[v][w];
+                        // min = min < D[w][x] ? min : D[w][x];
+                        // min = min < D[x][u] ? min : D[x][u];
+                        int min = 1;
                         D[u][v] -= min;
                         D[v][w] -= min;
                         D[w][x] -= min;
@@ -359,7 +360,7 @@ int solve_lazy(comp c)
 
     for (int i = 0; i < c.n; i++)
         for (int j = 0; j < c.n; j++)
-            D[i][j] = c.W[i][j];
+            D[i][j] = c.W[i][j] * 200;
 
     int *visited = malloc(sizeof(int) * c.n);
     int *on_stack = malloc(sizeof(int) * c.n);
@@ -367,7 +368,6 @@ int solve_lazy(comp c)
 
     int C = 0, lb = 0;
     lazy_cycle_packing(solver, D, c.n, visited, on_stack, prev, &C, &lb);
-
 
     fprintf(stderr, "Solving %d hard (lb=%d)\n", C, lb);
     ipamir_solve(solver);
@@ -384,7 +384,7 @@ int solve_lazy(comp c)
         for (int i = 0; i < c.n; i++)
             for (int j = 0; j < c.n; j++)
                 if (c.W[i][j] > 0)
-                    data[i * c.n + j] = ipamir_val_lit(solver, i * c.n + j) > 0 ? 0 : c.W[i][j];
+                    data[i * c.n + j] = ipamir_val_lit(solver, i * c.n + j) > 0 ? 0 : c.W[i][j] * 200;
 
         int added_lb = 0, old_C = C;
         lazy_cycle_packing(solver, D, c.n, visited, on_stack, prev, &C, &added_lb);
