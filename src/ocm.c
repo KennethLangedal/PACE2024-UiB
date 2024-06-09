@@ -140,3 +140,64 @@ int ocm_validate(ocm p)
     }
     return 1;
 }
+
+static inline void ocm_count_crossings(int *V, int *E, int u, int v, int *uv, int *vu)
+{
+    *uv = 0;
+    *vu = 0;
+    int i = V[u], j = V[v];
+    while (i < V[u + 1] && j < V[v + 1])
+    {
+        if (E[i] < E[j])
+        {
+            *vu += V[v + 1] - j;
+            i++;
+        }
+        else if (E[i] > E[j])
+        {
+            *uv += V[u + 1] - i;
+            j++;
+        }
+        else
+        {
+            i++;
+            j++;
+            *uv += V[u + 1] - i;
+            *vu += V[v + 1] - j;
+        }
+    }
+}
+
+static inline int compare_avg(const void *a, const void *b, void *arg)
+{
+    int u = *(int *)a, v = *(int *)b;
+    float *avg = (float *)arg;
+
+    if (avg[u] < avg[v])
+        return -1;
+    if (avg[v] < avg[u])
+        return 1;
+    return 0;
+}
+
+int *ocm_average_placement(ocm p)
+{
+    float *avg = malloc(sizeof(float) * p.n1);
+    for (int u = 0; u < p.n1; u++)
+    {
+        avg[u] = 0.0f;
+        for (int i = p.V[u]; i < p.V[u + 1]; i++)
+            avg += p.E[i];
+
+        avg[u] /= (float)(p.V[u + 1] - p.V[u]);
+    }
+
+    int *S = malloc(sizeof(int) * p.n1);
+    for (int u = 0; u < p.n1; u++)
+        S[u] = u;
+
+    qsort_r(S, p.n1, sizeof(int), compare_avg, avg);
+
+    free(avg);
+    return S;
+}

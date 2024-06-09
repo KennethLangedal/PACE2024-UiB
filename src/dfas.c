@@ -200,7 +200,7 @@ void tarjan_explore(int u, int *V, edge *E, tarjan *t, ocm p, comp *C, int *n)
 
 dfas dfas_construct(ocm p)
 {
-    int max_edges = 200000000;
+    int max_edges = 2000;
 
     int m = 0;
     edge *E = malloc(sizeof(edge) * (max_edges + 1));
@@ -309,6 +309,8 @@ comp dfas_construct_subgraph(comp c, int *E, int m)
     }
 
     int *data = malloc(sizeof(int) * n * n);
+    for (int i = 0; i < n * n; i++)
+        data[i] = 0;
     int **W = malloc(sizeof(int *) * n);
     for (int i = 0; i < n; i++)
         W[i] = data + i * n;

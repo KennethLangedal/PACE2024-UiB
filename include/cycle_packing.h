@@ -1,5 +1,4 @@
 #pragma once
-#include "dfas.h"
 
 typedef struct
 {
@@ -14,8 +13,8 @@ typedef struct
     cycle **edges;
 } packing;
 
-packing cycle_packing_init(comp c);
+packing cycle_packing_init(int **W, int n);
 
 void cycle_packing_free(packing p);
 
-void cycle_packing_greedy(packing p);
+void cycle_packing(packing p);

@@ -3,7 +3,7 @@
 
 #include <signal.h>
 
-void heuristics_greedy_improvement(comp c);
+void heuristics_greedy_improvement(comp c, volatile sig_atomic_t *tle);
 
 void heuristics_greedy_cut(comp c, volatile sig_atomic_t *tle);
 

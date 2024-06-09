@@ -15,3 +15,5 @@ ocm ocm_parse(FILE *f);
 void ocm_free(ocm p);
 
 int ocm_validate(ocm p);
+
+int *ocm_average_placement(ocm p);

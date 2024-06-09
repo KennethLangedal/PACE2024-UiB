@@ -8,26 +8,34 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// #define ARG_IO
+
 volatile sig_atomic_t tle = 0;
 
 int main(int argc, char **argv)
 {
+#ifdef ARG_IO
     FILE *f = fopen(argv[1], "r");
     ocm p = ocm_parse(f);
     fclose(f);
+#else
+    ocm p = ocm_parse(stdin);
+#endif
+
     dfas g = dfas_construct(p);
     int valid = g.n > 0;
     for (int i = 0; i < g.n; i++)
         if (g.C[i].n < 0)
             valid = 0;
 
+    int solved = 1, cost = 0;
     if (!valid)
     {
         fprintf(stderr, "%s, failed\n", argv[1]);
+        solved = 0;
     }
     else
     {
-        int solved = 1, cost = 0;
         for (int i = 0; i < g.n; i++)
         {
             comp c = g.C[i];
@@ -44,7 +52,7 @@ int main(int argc, char **argv)
                 for (int t = 0; t < 200; t++)
                 {
                     heuristic_randomize_solution(c, (rand() % 4) + 1);
-                    heuristics_greedy_improvement(c);
+                    heuristics_greedy_improvement(c, &tle);
                     tiny_solver_sliding_solve(c, 8);
 
                     int old_c = *c.c + 1;
@@ -70,13 +78,7 @@ int main(int argc, char **argv)
                 }
                 free(best);
 
-                fprintf(stderr, "%d %d\n", c.n, *c.c);
-
-                // packing p = cycle_packing_init(c);
-                // cycle_packing_greedy(p);
-                // fprintf(stderr, "%d %d\n", *c.c, *p.c);
-                // cycle_packing_free(p);
-                // solved = 0;
+                // fprintf(stderr, "%d %d\n", c.n, *c.c);
 
                 if (!solve_lazy(c))
                 {
@@ -85,22 +87,28 @@ int main(int argc, char **argv)
             }
             cost += *c.c;
         }
+    }
 
-        // fprintf(stderr, "%s %d\n", argv[1], cost + g.offset);
+    if (solved)
+    {
+        fprintf(stderr, "%s %d\n", argv[1], cost + g.offset);
 
-        // if (solved)
-        // {
-        //     int *S = dfas_get_solution(p, g);
-        //     f = fopen(argv[2], "w");
-        //     for (int i = 0; i < p.n1; i++)
-        //         fprintf(f, "%d\n", p.n0 + S[i] + 1);
-        //     fclose(f);
-        //     free(S);
-        // }
-        // else
-        // {
-        //     fprintf(stderr, "Failed to solve\n");
-        // }
+        int *S = dfas_get_solution(p, g);
+#ifdef ARG_IO
+        f = fopen(argv[2], "w");
+        for (int i = 0; i < p.n1; i++)
+            fprintf(f, "%d\n", p.n0 + S[i] + 1);
+        fclose(f);
+#else
+        for (int i = 0; i < p.n1; i++)
+            printf("%d\n", p.n0 + S[i] + 1);
+#endif
+
+        free(S);
+    }
+    else
+    {
+        fprintf(stderr, "Failed to solve\n");
     }
 
     ocm_free(p);

@@ -90,7 +90,7 @@ int try_left(int **W, int *O, int *c, int i, int n, int *lr, int *ll)
     return change < 0;
 }
 
-void heuristics_greedy_improvement(comp c)
+void heuristics_greedy_improvement(comp c, volatile sig_atomic_t *tle)
 {
     int *lr = malloc(sizeof(int) * c.n);
     int *ll = malloc(sizeof(int) * c.n);
@@ -117,7 +117,7 @@ void heuristics_greedy_improvement(comp c)
     }
 
     int found = 1;
-    while (found)
+    while (found && !(*tle))
     {
         found = 0;
         for (int _i = 0; _i < c.n; _i++)

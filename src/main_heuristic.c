@@ -33,9 +33,11 @@ int main(int argc, char **argv)
     if (!valid)
     {
         // TODO, add simple heuristic
-        // fprintf(stderr, "%s, failed\n", argv[1]);
+        fprintf(stderr, "%s, failed\n", argv[1]);
+        int *S = ocm_average_placement(p);
         for (int i = 0; i < p.n1; i++)
-            fprintf(stdout, "%d\n", i + 1 + p.n0);
+            fprintf(stdout, "%d\n", S[i] + 1 + p.n0);
+        free(S);
         ocm_free(p);
         dfas_free(g);
         return 0;
@@ -76,7 +78,7 @@ int main(int argc, char **argv)
             comp c = g.C[i];
 
             heuristic_randomize_solution(c, (rand() % 2) + 1);
-            heuristics_greedy_improvement(c);
+            heuristics_greedy_improvement(c, &tle);
             tiny_solver_sliding_solve(c, 8);
 
             int old_c = *c.c + 1;
