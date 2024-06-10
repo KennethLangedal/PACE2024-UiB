@@ -49,7 +49,7 @@ int main(int argc, char **argv)
                     best[j] = c.S[j];
                 int best_cost = *c.c;
 
-                for (int t = 0; t < 200; t++)
+                for (int t = 0; t < 400; t++)
                 {
                     heuristic_randomize_solution(c, (rand() % 4) + 1);
                     heuristics_greedy_improvement(c, &tle);
@@ -91,7 +91,7 @@ int main(int argc, char **argv)
 
     if (solved)
     {
-        fprintf(stderr, "%s %d\n", argv[1], cost + g.offset);
+        // fprintf(stderr, "%s %d\n", argv[1], cost + g.offset);
 
         int *S = dfas_get_solution(p, g);
 #ifdef ARG_IO
@@ -108,7 +108,7 @@ int main(int argc, char **argv)
     }
     else
     {
-        fprintf(stderr, "Failed to solve\n");
+        // fprintf(stderr, "Failed to solve\n");
     }
 
     ocm_free(p);

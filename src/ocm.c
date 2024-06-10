@@ -187,7 +187,7 @@ int *ocm_average_placement(ocm p)
     {
         avg[u] = 0.0f;
         for (int i = p.V[u]; i < p.V[u + 1]; i++)
-            avg += p.E[i];
+            avg[u] += p.E[i];
 
         avg[u] /= (float)(p.V[u + 1] - p.V[u]);
     }
@@ -200,4 +200,119 @@ int *ocm_average_placement(ocm p)
 
     free(avg);
     return S;
+}
+
+const int ABORT_LIMIT = 10000;
+
+int ocm_try_right(ocm p, int *O, int *c, int i)
+{
+    int u = O[i];
+    int change = 0, best_change = 0;
+    int last_pos = i;
+    for (int j = i + 1; j < p.n1 && change < ABORT_LIMIT; j++)
+    {
+        int v = O[j];
+
+        int uv, vu;
+        ocm_count_crossings(p.V, p.E, u, v, &uv, &vu);
+        change -= uv;
+        change += vu;
+        if (change < best_change)
+        {
+            best_change = change;
+            last_pos = j;
+            // break;
+        }
+        else if (change == best_change)
+            last_pos = j;
+    }
+    if (last_pos != i)
+    {
+        if (best_change < 0)
+            *c += best_change;
+        for (int k = i; k < last_pos; k++)
+            O[k] = O[k + 1];
+        O[last_pos] = u;
+    }
+    return best_change < 0;
+}
+
+int ocm_try_left(ocm p, int *O, int *c, int i)
+{
+    int u = O[i];
+    int change = 0, best_change = 0;
+    int last_pos = i;
+    for (int j = i - 1; j >= 0 && change < ABORT_LIMIT; j--)
+    {
+        int v = O[j];
+
+        int uv, vu;
+        ocm_count_crossings(p.V, p.E, u, v, &uv, &vu);
+        change -= vu;
+        change += uv;
+        if (change < best_change)
+        {
+            best_change = change;
+            last_pos = j;
+            // break;
+        }
+        else if (change == best_change)
+            last_pos = j;
+    }
+    if (last_pos != i)
+    {
+        if (best_change < 0)
+            *c += best_change;
+        for (int k = i; k > last_pos; k--)
+            O[k] = O[k - 1];
+        O[last_pos] = u;
+    }
+    return best_change < 0;
+}
+
+void ocm_shuffle(int *array, int n)
+{
+    for (int i = 0; i < n - 1; i++)
+    {
+        int j = i + rand() / (RAND_MAX / (n - i) + 1);
+        int t = array[j];
+        array[j] = array[i];
+        array[i] = t;
+    }
+}
+
+void ocm_greedy_improvement(ocm p, int *S, int *c, volatile sig_atomic_t *tle)
+{
+    int *O = malloc(sizeof(int) * p.n1);
+    for (int i = 0; i < p.n1; i++)
+        O[i] = i;
+    ocm_shuffle(O, p.n1);
+
+    int found = 1;
+    while (found && !(*tle))
+    {
+        found = 0;
+        for (int _i = 0; _i < p.n1 && !(*tle); _i++)
+        {
+            int i = O[_i];
+            if (_i & 1)
+            {
+                int imp = ocm_try_right(p, S, c, i);
+                if (!imp)
+                    imp = ocm_try_left(p, S, c, i);
+                found |= imp;
+            }
+            else
+            {
+                int imp = ocm_try_left(p, S, c, i);
+                if (!imp)
+                    imp = ocm_try_right(p, S, c, i);
+                found |= imp;
+            }
+        }
+        // fprintf(stderr, "\r%d", *c);
+        // fflush(stderr);
+    }
+
+    free(O);
 }

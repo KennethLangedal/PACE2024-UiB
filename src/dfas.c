@@ -200,7 +200,7 @@ void tarjan_explore(int u, int *V, edge *E, tarjan *t, ocm p, comp *C, int *n)
 
 dfas dfas_construct(ocm p)
 {
-    int max_edges = 2000;
+    int max_edges = 200000000;
 
     int m = 0;
     edge *E = malloc(sizeof(edge) * (max_edges + 1));
@@ -232,7 +232,7 @@ dfas dfas_construct(ocm p)
                 if (m >= max_edges)
                 {
                     free(E);
-                    return (dfas){.n = -1, .C = NULL, .O = NULL, .offset = 0};
+                    return (dfas){.n = -1, .C = NULL, .O = g.O, .offset = 0};
                 }
 
                 if (c_uv < c_vu)

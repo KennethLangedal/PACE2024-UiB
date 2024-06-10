@@ -16,9 +16,9 @@ void lazy_add_length_3(void *solver, int **D, int n, int *C)
             {
                 if (w != v && D[u][v] > 0 && D[v][w] > 0 && D[w][u] > 0)
                 {
-                    ipamir_add_hard(solver, u * n + v);
-                    ipamir_add_hard(solver, v * n + w);
-                    ipamir_add_hard(solver, w * n + u);
+                    ipamir_add_hard(solver, (u * n + v) + 1);
+                    ipamir_add_hard(solver, (v * n + w) + 1);
+                    ipamir_add_hard(solver, (w * n + u) + 1);
                     ipamir_add_hard(solver, 0);
                     (*C)++;
                 }
@@ -43,12 +43,17 @@ void lazy_add_length_4(void *solver, int **D, int n, int *C)
                 {
                     if (x != v && x != w && D[w][x] > 0 && D[x][u] > 0)
                     {
-                        ipamir_add_hard(solver, u * n + v);
-                        ipamir_add_hard(solver, v * n + w);
-                        ipamir_add_hard(solver, w * n + x);
-                        ipamir_add_hard(solver, x * n + u);
+                        // if ((rand() % 100) > 0)
+                        //     continue;
+                        ipamir_add_hard(solver, (u * n + v) + 1);
+                        ipamir_add_hard(solver, (v * n + w) + 1);
+                        ipamir_add_hard(solver, (w * n + x) + 1);
+                        ipamir_add_hard(solver, (x * n + u) + 1);
                         ipamir_add_hard(solver, 0);
                         (*C)++;
+
+                        if (*C > 50000000)
+                            return;
                     }
                 }
             }
@@ -65,7 +70,7 @@ int solve_lazy(comp c)
     for (int i = 0; i < c.n; i++)
         for (int j = 0; j < c.n; j++)
             if (c.W[i][j] > 0)
-                ipamir_add_soft_lit(solver, i * c.n + j, c.W[i][j]);
+                ipamir_add_soft_lit(solver, (i * c.n + j) + 1, c.W[i][j]);
 
     int *data = malloc(sizeof(int) * c.n * c.n);
     int **D = malloc(sizeof(int *) * c.n);
@@ -98,7 +103,7 @@ int solve_lazy(comp c)
         for (int i = 0; i < c.n; i++)
             for (int j = 0; j < c.n; j++)
                 if (c.W[i][j] > 0)
-                    D[i][j] = ipamir_val_lit(solver, i * c.n + j) >= 0 ? 0 : c.W[i][j];
+                    D[i][j] = ipamir_val_lit(solver, (i * c.n + j) + 1) >= 0 ? 0 : c.W[i][j];
 
         packing p = cycle_packing_init(D, c.n);
         cycle_packing(p);
@@ -116,7 +121,7 @@ int solve_lazy(comp c)
 
                     cycle *c = p.edges[i];
                     for (int j = 0; j < c->n; j++)
-                        ipamir_add_hard(solver, c->e[j]);
+                        ipamir_add_hard(solver, c->e[j] + 1);
 
                     ipamir_add_hard(solver, 0);
                     C++;
