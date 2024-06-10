@@ -20,3 +20,17 @@ The **compile_dep.sh** script clones and builds the necessary requirements. Afte
 ./compile_dep.sh
 make
 ```
+
+## Running the programs
+
+After building, there should be two executable files: **exact** and **heuristic**. They both take input from stdin and write the results to stdout.
+
+```
+./exact < input.gr > output.sol
+```
+
+The heuristic runs until it receives a SIGTERM signal.
+
+```
+timeout 5m ./heuristic < input.gr > output.sol
+```
