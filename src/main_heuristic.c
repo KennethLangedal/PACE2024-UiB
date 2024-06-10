@@ -1,7 +1,6 @@
 #include "ocm.h"
 #include "dfas.h"
 #include "tiny_solver.h"
-#include "lower_bound.h"
 #include "heuristics.h"
 
 #include <stdio.h>
