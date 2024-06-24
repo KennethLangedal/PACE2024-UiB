@@ -1,6 +1,6 @@
 [![DOI](https://zenodo.org/badge/756037799.svg)](https://zenodo.org/doi/10.5281/zenodo.11540760)
 
-# PACE2024-UiB
+# LUNCH &mdash; Linear Uncrossing Heuristics
 
 Submission for PACE2024 by the algorithms group at UiB.
 
